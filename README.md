@@ -1,0 +1,2 @@
+# zshell
+personal zshell configs
