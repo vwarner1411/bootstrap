@@ -44,9 +44,3 @@
     state: directory
     mode: "0755"
   become: false
-
-- name: Ensure jsontools cli is available via pipx
-  community.general.pipx:
-    name: jsontools
-    state: latest
-  become: false

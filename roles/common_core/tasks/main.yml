@@ -34,7 +34,7 @@
     - /usr/local/lib
   when: ansible_facts.os_family == "Debian"
 
-- name: Ensure Rosetta Homebrew (macOS) is installed
+- name: Ensure Homebrew is installed (macOS)
   community.general.homebrew:
     name: []
     update_homebrew: false
