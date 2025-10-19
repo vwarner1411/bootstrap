@@ -1,94 +1,92 @@
-# Zsh Configuration
+# Bootstrap Environment
 
-This repository contains Valerie's personal `.zshrc` file.  
-It customizes the Z shell (zsh) environment with useful plugins, aliases, and tools to improve productivity on macOS and Linux.
+Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu today, Debian/Omarchy next). The repo delivers:
 
----
+- A single `curl` entrypoint that installs prerequisites, syncs `chezmoi` dotfiles, and applies Ansible roles.
+- Ansible playbooks/roles for idempotent package management without Homebrew on Linux.
+- Tests to guard syntax, linting, and shell quality.
 
-## Features
+## Quick Start
 
-### Core Setup
-- **Coreutils first**: Replaces default macOS utilities with GNU Coreutils via Homebrew.
-- **History**: Expands history to 10,000 entries and ensures history is always saved.
-- **Extended globbing**: Enables advanced globbing patterns (`setopt extended_glob`).
+Interactive shells (TTY) will prompt for sudo when needed.
 
-### Plugins & Enhancements
-- **zsh-completions**: Adds extended completions for many commands.
-- **zsh-syntax-highlighting**: Highlights commands as you type.
-- **zsh-autosuggestions**: Suggests commands from history.
-- **zmv**: Autoloads the powerful `zmv` function for batch renaming.
+```bash
+curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/bootstrap/scripts/bootstrap.sh | bash
+```
 
-### Oh My Zsh
-- Uses [Oh My Zsh](https://ohmyz.sh/) as a plugin manager.
-- Theme: `dracula-pro`.
-- Plugins enabled:
-  - `git`
-  - `autoupdate`
-  - `jsontools`
+Environment variables:
 
-### Aliases
-- **Python**: Defaults `python` → `python3`, `pip` → `pip3`.
-- **Editor**: `vim` and `vi` point to Neovim with a custom config.
-- **Mosh**: Runs mosh with firewall allowance.
-- **Homebrew maintenance**: `brewski` updates, upgrades, cleans, and checks for issues.
-- **Process kill**: `killadobe` terminates all Adobe processes.
-- **YouTube downloads**: Aliases for `yt-dlp` with aria2c for fast parallel downloads.
-- **sudo TouchID**: `touchsudo` enables macOS TouchID for `sudo`.
-- **Directory listing**: Aliases `ls`, `l`, and `ll` to [lsd](https://github.com/lsd-rs/lsd).
-- **Misc**:
-  - `powershell` → `pwsh`
-  - `rsync` → Homebrew-installed `rsync`
+- `PROFILE=server|desktop` (default `desktop`)
+- `REPO_BRANCH` (defaults to `bootstrap`)
+- `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
 
----
+Re-run the same command any time to upgrade packages and reapply dotfiles.
 
-## Requirements
+## What Gets Installed
 
-To use this `.zshrc` effectively, install the following:
+| Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
+|---------------------|-----------------------------------------------|-------------------------------------------------------------------|
+| Core CLI            | git, curl, wget, rsync, jq, ncdu, tree, lynx  | Same set using `apt`, plus python3/pip, build-essential, sysstat  |
+| Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned via Git, Oh My Zsh from upstream       |
+| Prompt/UX           | starship, lsd, yazi, fzf, btop, kitty         | apt for btop/lsd/fzf/kitty, GitHub releases for starship & yazi   |
+| Development         | neovim, mosh, ansible, Powershell, yt-dlp     | ansible/mosh/yt-dlp via apt, Powershell via Microsoft repo        |
+| Dotfiles            | Managed via `chezmoi init --apply`            | Same dotfiles source                                              |
 
-- [zsh](https://www.zsh.org/)
-- [Oh My Zsh](https://ohmyz.sh/)
-- [Homebrew](https://brew.sh/)
-- [coreutils](https://formulae.brew.sh/formula/coreutils)
-- [zsh-syntax-highlighting](https://formulae.brew.sh/formula/zsh-syntax-highlighting)
-- [zsh-autosuggestions](https://formulae.brew.sh/formula/zsh-autosuggestions)
-- [lsd](https://github.com/lsd-rs/lsd)
-- [neovim](https://neovim.io/)
-- [mosh](https://mosh.org/)
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-- [aria2](https://aria2.github.io/)
-- [powershell](https://formulae.brew.sh/cask/powershell)
+Linux nodes never rely on Homebrew; everything comes from apt or upstream releases.
 
----
+## Project Layout
 
-## Installation
+```
+├── ansible.cfg
+├── inventory/hosts.yml
+├── playbooks/bootstrap.yml
+├── requirements.yml
+├── roles/
+│   ├── common_core/        # shared baseline
+│   ├── linux_cli/          # apt + GitHub releases
+│   ├── macos_cli/          # Homebrew formulas/casks
+│   ├── shell_extras/       # oh-my-zsh and plugins
+│   └── desktop_tools/      # desktop-only extras
+├── scripts/bootstrap.sh    # curl-able entrypoint
+└── tests/smoke.sh          # syntax/lint/shellcheck
+```
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/vwarner1411/zshell.git
-   ```
+## Running Manually
 
-2. Backup your existing `.zshrc`:
-   ```bash
-   mv ~/.zshrc ~/.zshrc.backup
-   ```
+```bash
+# assumes repo cloned to ~/src/zshell
+cd ~/src/zshell
+ansible-galaxy collection install -r requirements.yml --force
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop" --ask-become-pass
+```
 
-3. Symlink this repo’s `.zshrc`:
-   ```bash
-   ln -s ~/path/to/repo/.zshrc ~/.zshrc
-   ```
+Switch to server profile:
 
-4. Reload your shell:
-   ```bash
-   source ~/.zshrc
-   ```
+```bash
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server" --ask-become-pass
+```
 
----
+## Tests
 
-## Notes
-- Make sure you have the [Dracula Pro theme](https://draculatheme.com/pro) for Oh My Zsh, or adjust the theme in the `.zshrc`.
-- Some aliases (like `mosh` and `touchsudo`) are tailored for Valerie’s environment and may need editing for yours.
+Use the smoke script to validate changes before committing:
 
----
+```bash
+./tests/smoke.sh
+```
+
+- `ansible-playbook --syntax-check`
+- `ansible-lint` (if present)
+- `shellcheck` for the bootstrap script
+
+Add Molecule or CI workflows later without changing the bootstrap flow.
+
+## Roadmap
+
+- Debian + Arch inventory groups
+- Additional Molecule scenarios
+- Optional GUI packages gated by tags
+- Cached release lookup for air-gapped installs
 
 ## License
-MIT – feel free to reuse and adapt.
+
+MIT – reuse and adapt as needed. Pull requests welcome.

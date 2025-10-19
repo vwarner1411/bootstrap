@@ -1,0 +1,202 @@
+- name: Install additional Debian packages
+  ansible.builtin.apt:
+    name:
+      - btop
+      - lsd
+      - fzf
+      - yt-dlp
+      - mosh
+      - ansible
+      - python3-pip
+      - python3-venv
+    state: present
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure Microsoft GPG key is installed
+  ansible.builtin.get_url:
+    url: https://packages.microsoft.com/keys/microsoft.asc
+    dest: /usr/share/keyrings/microsoft.gpg
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
+
+- name: Add Microsoft repository for PowerShell
+  ansible.builtin.apt_repository:
+    repo: >
+      deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg]
+      https://packages.microsoft.com/repos/microsoft-ubuntu-{{ ansible_distribution_release }}-prod
+      {{ ansible_distribution_release }} main
+    filename: microsoft-powershell.list
+    state: present
+  register: powershell_repo
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
+
+- name: Update apt cache after adding Microsoft repo
+  ansible.builtin.apt:
+    update_cache: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
+    - powershell_repo is changed
+
+- name: Install PowerShell
+  ansible.builtin.apt:
+    name: powershell
+    state: present
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
+
+- name: Install ncurses-term for kitty terminfo
+  ansible.builtin.apt:
+    name: ncurses-term
+    state: present
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check current starship version
+  ansible.builtin.command: starship --version
+  register: starship_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest starship release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/starship/starship/releases/latest
+    return_content: true
+  register: starship_release
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set starship release facts
+  ansible.builtin.set_fact:
+    starship_target_version: "{{ starship_release.json.tag_name }}"
+    starship_asset_url: >-
+      {{
+        (
+          starship_release.json.assets
+          | selectattr('name', 'search', 'x86_64-unknown-linux-gnu.tar.gz$')
+          | map(attribute='browser_download_url')
+          | list
+          | first
+        )
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download starship release
+  ansible.builtin.get_url:
+    url: "{{ starship_asset_url }}"
+    dest: /tmp/starship.tar.gz
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - starship_asset_url | length > 0
+    - starship_version_check.stdout is not defined or starship_target_version not in starship_version_check.stdout
+
+- name: Install starship binary
+  ansible.builtin.unarchive:
+    src: /tmp/starship.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    mode: "0755"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - starship_asset_url | length > 0
+    - starship_version_check.stdout is not defined or starship_target_version not in starship_version_check.stdout
+
+- name: Ensure starship binary is executable
+  ansible.builtin.file:
+    path: /usr/local/bin/starship
+    mode: "0755"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check current yazi version
+  ansible.builtin.command: yazi --version
+  register: yazi_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest yazi release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/sxyazi/yazi/releases/latest
+    return_content: true
+  register: yazi_release
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set yazi release facts
+  ansible.builtin.set_fact:
+    yazi_target_version: "{{ yazi_release.json.tag_name }}"
+    yazi_asset_name: >-
+      {{
+        (
+          yazi_release.json.assets
+          | selectattr('name', 'search', 'x86_64-unknown-linux-gnu.zip$')
+          | map(attribute='name')
+          | list
+          | first
+        )
+        | default('', true)
+      }}
+    yazi_asset_url: >-
+      {{
+        (
+          yazi_release.json.assets
+          | selectattr('name', 'search', 'x86_64-unknown-linux-gnu.zip$')
+          | map(attribute='browser_download_url')
+          | list
+          | first
+        )
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download yazi release
+  ansible.builtin.get_url:
+    url: "{{ yazi_asset_url }}"
+    dest: /tmp/yazi.zip
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_asset_url | length > 0
+    - yazi_version_check.stdout is not defined or yazi_target_version not in yazi_version_check.stdout
+
+- name: Prepare yazi install directory
+  ansible.builtin.file:
+    path: /usr/local/share/yazi
+    state: directory
+    mode: "0755"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Unpack yazi release
+  ansible.builtin.unarchive:
+    src: /tmp/yazi.zip
+    dest: /usr/local/share/yazi
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_asset_url | length > 0
+    - yazi_version_check.stdout is not defined or yazi_target_version not in yazi_version_check.stdout
+
+- name: Copy yazi binary into PATH
+  ansible.builtin.copy:
+    src: "/usr/local/share/yazi/{{ (yazi_asset_name | regex_replace('\\.zip$', '')) }}/yazi"
+    dest: /usr/local/bin/yazi
+    remote_src: true
+    mode: "0755"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_asset_name | length > 0
+
+- name: Symlink yazi share directory
+  ansible.builtin.file:
+    src: "/usr/local/share/yazi/{{ (yazi_asset_name | regex_replace('\\.zip$', '')) }}/share"
+    dest: /usr/local/share/yazi/share
+    state: link
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_asset_name | length > 0

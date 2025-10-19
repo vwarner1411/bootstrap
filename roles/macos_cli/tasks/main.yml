@@ -1,0 +1,11 @@
+- name: Ensure Homebrew bundle for CLI tools is installed
+  community.general.homebrew:
+    name: "{{ macos_cli_packages }}"
+    state: latest
+    update_homebrew: true
+
+- name: Install Homebrew casks for desktop tools
+  community.general.homebrew_cask:
+    name: "{{ macos_cask_packages }}"
+    state: latest
+  when: macos_cask_packages | length > 0

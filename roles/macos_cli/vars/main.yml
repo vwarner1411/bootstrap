@@ -1,0 +1,26 @@
+macos_cli_packages:
+  - curl
+  - git
+  - jq
+  - lynx
+  - ncdu
+  - neovim
+  - python
+  - rsync
+  - tree
+  - wget
+  - zsh
+  - coreutils
+  - btop
+  - kitty
+  - starship
+  - lsd
+  - yazi
+  - fzf
+  - yt-dlp
+  - mosh
+  - ansible
+  - powershell
+
+macos_cask_packages:
+  - iterm2

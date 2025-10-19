@@ -1,0 +1,53 @@
+- name: Ensure curl is available for shell role
+  ansible.builtin.apt:
+    name: curl
+    state: present
+  when: ansible_facts.os_family == "Debian"
+  become: true
+
+- name: Install oh-my-zsh
+  ansible.builtin.git:
+    repo: "{{ oh_my_zsh_repo }}"
+    dest: "{{ oh_my_zsh_dir }}"
+    version: master
+    update: true
+  become: false
+  register: ohmyzsh_clone
+
+- name: Ensure custom plugin directories exist
+  ansible.builtin.file:
+    path: "{{ oh_my_zsh_custom }}/plugins"
+    state: directory
+    mode: "0755"
+  become: false
+
+- name: Clone Zsh plugins
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    dest: "{{ item.dest }}"
+    version: master
+    update: true
+  loop: "{{ zsh_plugins }}"
+  become: false
+
+- name: Install Dracula theme for oh-my-zsh
+  ansible.builtin.git:
+    repo: "{{ oh_my_zsh_theme_repo }}"
+    dest: "{{ oh_my_zsh_theme_dest }}"
+    version: master
+    update: true
+  become: false
+
+- name: Ensure Zsh completions directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/.zshrc.d"
+    state: directory
+    mode: "0755"
+  become: false
+
+- name: Install jsontools with pipx
+  ansible.builtin.pip:
+    name: jsontools
+    executable: pip3
+    extra_args: --user
+  become: false

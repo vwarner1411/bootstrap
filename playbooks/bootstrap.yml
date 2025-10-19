@@ -1,0 +1,15 @@
+- name: Bootstrap workstation
+  hosts: localhost
+  gather_facts: true
+  become: true
+  vars:
+    profile: "{{ profile | default('desktop') }}"
+  roles:
+    - role: common_core
+    - role: linux_cli
+      when: ansible_facts.os_family == "Debian"
+    - role: macos_cli
+      when: ansible_facts.system == "Darwin"
+    - role: shell_extras
+    - role: desktop_tools
+      when: profile == "desktop"
