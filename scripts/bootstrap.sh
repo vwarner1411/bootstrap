@@ -104,8 +104,11 @@ ensure_chezmoi() {
 
 clone_repo() {
   if command_exists git; then
+    local current_root
+    current_root="$(pwd)"
     git config --global --add safe.directory "$WORKDIR" || true
-    git config --global --add safe.directory "$PWD" || true
+    git config --global --add safe.directory "$current_root" || true
+    git config --global --add safe.directory "$current_root/.git" || true
   fi
   ensure_directory "$(dirname "$WORKDIR")"
   if [ -d "$WORKDIR/.git" ]; then
