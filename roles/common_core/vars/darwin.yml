@@ -1,4 +1,4 @@
-common_brew_packages:
+common_core_brew_packages:
   - ansible
   - curl
   - git

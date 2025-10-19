@@ -7,8 +7,8 @@
 
 - name: Install oh-my-zsh
   ansible.builtin.git:
-    repo: "{{ oh_my_zsh_repo }}"
-    dest: "{{ oh_my_zsh_dir }}"
+    repo: "{{ shell_extras_oh_my_zsh_repo }}"
+    dest: "{{ shell_extras_oh_my_zsh_dir }}"
     version: master
     update: true
   become: false
@@ -16,7 +16,7 @@
 
 - name: Ensure custom plugin directories exist
   ansible.builtin.file:
-    path: "{{ oh_my_zsh_custom }}/plugins"
+    path: "{{ shell_extras_oh_my_zsh_custom }}/plugins"
     state: directory
     mode: "0755"
   become: false
@@ -27,13 +27,13 @@
     dest: "{{ item.dest }}"
     version: master
     update: true
-  loop: "{{ zsh_plugins }}"
+  loop: "{{ shell_extras_zsh_plugins }}"
   become: false
 
 - name: Install Dracula theme for oh-my-zsh
   ansible.builtin.git:
-    repo: "{{ oh_my_zsh_theme_repo }}"
-    dest: "{{ oh_my_zsh_theme_dest }}"
+    repo: "{{ shell_extras_oh_my_zsh_theme_repo }}"
+    dest: "{{ shell_extras_oh_my_zsh_theme_dest }}"
     version: master
     update: true
   become: false

@@ -1,4 +1,4 @@
-macos_cli_packages:
+macos_cli_brew_packages:
   - curl
   - git
   - jq
@@ -22,5 +22,5 @@ macos_cli_packages:
   - ansible
   - powershell
 
-macos_cask_packages:
+macos_cli_cask_packages:
   - iterm2

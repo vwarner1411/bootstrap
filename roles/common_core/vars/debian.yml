@@ -1,4 +1,4 @@
-common_debian_packages:
+common_core_debian_packages:
   - apt-transport-https
   - build-essential
   - ca-certificates

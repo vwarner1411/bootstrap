@@ -20,7 +20,7 @@
 
 - name: Install core packages on Debian-based systems
   ansible.builtin.apt:
-    name: "{{ common_debian_packages }}"
+    name: "{{ common_core_debian_packages }}"
     state: present
   when: ansible_facts.os_family == "Debian"
 
@@ -43,7 +43,7 @@
 
 - name: Install core packages with Homebrew (macOS)
   community.general.homebrew:
-    name: "{{ common_brew_packages }}"
+    name: "{{ common_core_brew_packages }}"
     state: latest
     update_homebrew: true
   when: ansible_facts.system == "Darwin"
