@@ -25,3 +25,4 @@ common_core_debian_packages:
   - iotop
   - iftop
   - unzip
+  - pipx

@@ -22,3 +22,4 @@ common_core_brew_packages:
   - mosh
   - powershell
   - zip
+  - pipx

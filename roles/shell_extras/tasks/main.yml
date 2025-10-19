@@ -45,9 +45,8 @@
     mode: "0755"
   become: false
 
-- name: Install jsontools with pipx
-  ansible.builtin.pip:
+- name: Ensure jsontools cli is available via pipx
+  community.general.pipx:
     name: jsontools
-    executable: pip3
-    extra_args: --user
+    state: latest
   become: false
