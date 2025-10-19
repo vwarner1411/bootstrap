@@ -18,7 +18,9 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ansible ansible-lint shellcheck python3-pip python3-venv
+          sudo apt-get install -y shellcheck python3-pip python3-venv
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ansible==9.3.0 ansible-lint==24.6.0
 
       - name: Install Ansible collections
         run: |
