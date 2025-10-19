@@ -55,13 +55,18 @@
   register: powershell_release
   when: ansible_facts.os_family == "Debian"
 
+- name: Normalize PowerShell release data
+  ansible.builtin.set_fact:
+    powershell_release_data: "{{ powershell_release.json | default({}) }}"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Set PowerShell release facts
   ansible.builtin.set_fact:
-    powershell_target_version: "{{ powershell_release.json.tag_name }}"
+    powershell_target_version: "{{ powershell_release_data.tag_name | default('') }}"
     powershell_asset: >-
       {{
         (
-          powershell_release.json.assets
+          powershell_release_data.assets | default([])
           | selectattr('name', 'search', 'linux-x64\\.tar\\.gz$')
           | map(attribute='browser_download_url')
           | list
