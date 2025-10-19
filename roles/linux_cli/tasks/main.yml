@@ -114,13 +114,22 @@
     - ansible_facts.os_family == "Debian"
     - powershell_needs_install
 
-- name: Ensure PowerShell symlink exists
+- name: Check extracted pwsh path
+  ansible.builtin.stat:
+    path: /opt/microsoft/powershell/pwsh
+  register: pwsh_stat
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure PowerShell symlink exists (only if we installed from release)
   ansible.builtin.file:
     src: /opt/microsoft/powershell/pwsh
     dest: /usr/local/bin/pwsh
     state: link
     force: true
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - powershell_needs_install
+    - pwsh_stat.stat.exists
 
 - name: Check current btop version
   ansible.builtin.command: btop --version
