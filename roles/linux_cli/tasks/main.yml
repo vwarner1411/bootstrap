@@ -58,11 +58,12 @@
 - name: Set PowerShell release facts
   ansible.builtin.set_fact:
     powershell_target_version: "{{ powershell_release.json.tag_name | default('') }}"
+    powershell_assets: "{{ powershell_release.json.assets | default([]) }}"
     powershell_asset: >-
       {{
         (
-          powershell_release.json.assets | default([])
-          | selectattr('name', 'search', 'linux-x64\\.tar\\.gz$')
+          powershell_assets
+          | selectattr('name', 'match', 'powershell-[0-9.]+-linux-x64\\.tar\\.gz$')
           | map(attribute='browser_download_url')
           | list
           | first
