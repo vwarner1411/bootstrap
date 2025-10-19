@@ -1,5 +1,7 @@
 # Everything in this file only applies on Debian-family hosts
-- block:
+- name: Configure Linux CLI tooling on Debian
+  when: ansible_facts.os_family == "Debian"
+  block:
     ###########################################################################
     # Base system packages and build deps
     ###########################################################################
@@ -17,7 +19,7 @@
           - build-essential
           - python3-venv
           - pipx
-      state: present
+        state: present
 
     - name: Install build dependencies for mosh
       ansible.builtin.apt:
@@ -32,7 +34,7 @@
           - automake
           - libtool
           - libssl-dev
-      state: present
+        state: present
 
     ###########################################################################
     # Helper facts
@@ -106,7 +108,7 @@
     - name: Set PowerShell release facts
       ansible.builtin.set_fact:
         powershell_target_version_raw: "{{ powershell_release.json.tag_name | default('') }}"
-        powershell_target_version: "{{ powershell_target_version_raw | regex_replace('^v','') }}"
+        powershell_target_version: "{{ powershell_target_version_raw | regex_replace('^v', '') }}"
         powershell_asset: >-
           {{
             (powershell_release.json.assets | default([]))
@@ -195,14 +197,14 @@
       ansible.builtin.set_fact:
         btop_release_data: "{{ btop_release.json | default({}) }}"
         btop_target_version_raw: "{{ btop_release_data.tag_name | default('') }}"
-        btop_target_version: "{{ btop_target_version_raw | regex_replace('^v','') }}"
+        btop_target_version: "{{ btop_target_version_raw | regex_replace('^v', '') }}"
         btop_asset_list: >-
           {{
             btop_release_data.get('assets', [])
             | selectattr('name','match','^btop-' ~ arch_cpu ~ '-linux-musl\\.tbz$')
             | list
           }}
-        btop_asset_url: "{{ btop_asset_list[0].browser_download_url if btop_asset_list|length > 0 else '' }}"
+        btop_asset_url: "{{ btop_asset_list[0].browser_download_url if btop_asset_list | length > 0 else '' }}"
         btop_present: "{{ (btop_version_check.rc | default(1)) == 0 }}"
         btop_present_version: >-
           {{
@@ -273,7 +275,7 @@
     - name: Set lsd release facts
       ansible.builtin.set_fact:
         lsd_target_version_raw: "{{ lsd_release.json.tag_name | default('') }}"
-        lsd_target_version: "{{ lsd_target_version_raw | regex_replace('^v','') }}"
+        lsd_target_version: "{{ lsd_target_version_raw | regex_replace('^v', '') }}"
         lsd_triple: "{{ arch_cpu ~ '-unknown-linux-gnu' }}"
         lsd_asset_url: >-
           {{
@@ -343,7 +345,7 @@
     - name: Set fzf release facts
       ansible.builtin.set_fact:
         fzf_target_version_raw: "{{ fzf_release.json.tag_name | default('') }}"
-        fzf_target_version: "{{ fzf_target_version_raw | regex_replace('^v','') }}"
+        fzf_target_version: "{{ fzf_target_version_raw | regex_replace('^v', '') }}"
         fzf_asset_url: >-
           {{
             (fzf_release.json.assets | default([]))
@@ -457,7 +459,7 @@
     - name: Set mosh release facts
       ansible.builtin.set_fact:
         mosh_target_version_raw: "{{ mosh_release.json.tag_name | default('') }}"
-        mosh_target_version: "{{ mosh_target_version_raw | regex_replace('^v','') }}"
+        mosh_target_version: "{{ mosh_target_version_raw | regex_replace('^v', '') }}"
         mosh_asset_url: >-
           {{
             (mosh_release.json.assets | default([]))
@@ -538,7 +540,7 @@
 
     - name: Set yt-dlp release facts
       ansible.builtin.set_fact:
-        ytdlp_target_version: "{{ ytdlp_release.json.tag_name | default('') | regex_replace('^v','') }}"
+        ytdlp_target_version: "{{ ytdlp_release.json.tag_name | default('') | regex_replace('^v', '') }}"
         ytdlp_asset_url: >-
           {{
             (ytdlp_release.json.assets | default([]))
@@ -559,6 +561,3 @@
         dest: /usr/local/bin/yt-dlp
         mode: "0755"
       when: ytdlp_needs_install
-
-  when: ansible_facts.os_family == "Debian"
-
