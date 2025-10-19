@@ -59,6 +59,14 @@
     - ansible_facts.os_family == "Debian"
     - ansible_facts.distribution == "Ubuntu"
 
+- name: Remove legacy Microsoft repo file
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/microsoft-prod.list
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
+
 - name: Add Microsoft repository for PowerShell
   ansible.builtin.apt_repository:
     repo: >
