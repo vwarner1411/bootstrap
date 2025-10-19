@@ -129,14 +129,19 @@
   ansible.builtin.set_fact:
     btop_target_version: "{{ btop_release_data.tag_name | default('') }}"
     btop_arch: >-
-      {{ 'x86_64' if ansible_facts.architecture in ['x86_64','amd64']
-         else 'aarch64' if ansible_facts.architecture in ['aarch64','arm64']
-         else ansible_facts.architecture }}
+      {{
+        'x86_64' if ansible_facts.architecture in ['x86_64', 'amd64'] else
+        'aarch64' if ansible_facts.architecture in ['aarch64', 'arm64'] else
+        ansible_facts.architecture
+      }}
     btop_asset_list: >-
-      {{ btop_release_data.get('assets', []) 
-         | selectattr('name','match', '^btop-' ~ btop_arch ~ '-linux-musl\\.tbz$')
-         | list }}
-    btop_asset_url: "{{ btop_asset_list[0].browser_download_url if btop_asset_list|length > 0 else '' }}"
+      {{
+        btop_release_data.get('assets', [])
+        | selectattr('name', 'match', '^btop-' ~ btop_arch ~ '-linux-musl\\.tbz$')
+        | list
+      }}
+    btop_asset_url: >-
+      {{ btop_asset_list[0].browser_download_url if btop_asset_list | length > 0 else '' }}
     btop_version_present: "{{ (btop_version_check.rc | default(1)) == 0 }}"
     btop_needs_install: >-
       {{
@@ -147,6 +152,13 @@
         )
       }}
   when: ansible_facts.os_family == "Debian"
+
+- name: Debug btop asset resolution
+  ansible.builtin.debug:
+    msg: "Skipping btop install: no {{ btop_arch }} asset found in {{ btop_release_data.tag_name | default('unknown') }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_asset_url | length == 0
 
 - name: Download btop release
   ansible.builtin.get_url:
