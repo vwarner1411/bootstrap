@@ -1,553 +1,564 @@
-- name: Install supporting Debian packages
-  ansible.builtin.apt:
-    name:
-      - ncurses-term
-      - xz-utils
-    state: present
+# Everything in this file only applies on Debian-family hosts
+- block:
+    ###########################################################################
+    # Base system packages and build deps
+    ###########################################################################
+    - name: Update apt cache and install base packages
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        name:
+          - ncurses-term
+          - xz-utils
+          - bzip2
+          - tar
+          - curl
+          - ca-certificates
+          - build-essential
+          - python3-venv
+          - pipx
+      state: present
+
+    - name: Install build dependencies for mosh
+      ansible.builtin.apt:
+        name:
+          - protobuf-compiler
+          - libprotobuf-dev
+          - pkg-config
+          - libutempter-dev
+          - libncurses-dev
+          - zlib1g-dev
+          - autoconf
+          - automake
+          - libtool
+          - libssl-dev
+      state: present
+
+    ###########################################################################
+    # Helper facts
+    ###########################################################################
+    - name: Normalize architecture strings for assets
+      ansible.builtin.set_fact:
+        arch_cpu: >-
+          {{ 'x86_64' if ansible_facts.architecture in ['x86_64','amd64']
+             else 'aarch64' if ansible_facts.architecture in ['aarch64','arm64']
+             else ansible_facts.architecture }}
+        arch_go: >-
+          {{ 'amd64' if ansible_facts.architecture in ['x86_64','amd64']
+             else 'arm64' if ansible_facts.architecture in ['aarch64','arm64']
+             else ansible_facts.architecture }}
+
+    ###########################################################################
+    # pipx → ansible (optional convenience)
+    ###########################################################################
+    - name: Check that pipx is available
+      ansible.builtin.command: pipx --version
+      register: pipx_check
+      changed_when: false
+      failed_when: false
+
+    - name: Ensure ansible is installed with pipx (optional)
+      community.general.pipx:
+        name: ansible
+        state: latest
+      when: pipx_check.rc == 0
+
+    - name: Link ansible pipx binaries into /usr/local/bin (if present)
+      ansible.builtin.stat:
+        path: "/root/.local/pipx/venvs/ansible/bin/ansible"
+      register: pipx_ansible_stat
+
+    - name: Link ansible pipx binaries into /usr/local/bin
+      ansible.builtin.file:
+        src: "/root/.local/pipx/venvs/ansible/bin/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+        force: true
+      loop:
+        - ansible
+        - ansible-playbook
+        - ansible-config
+        - ansible-galaxy
+      when: pipx_ansible_stat.stat.exists
+
+    ###########################################################################
+    # PowerShell (pwsh)
+    ###########################################################################
+    - name: Check current PowerShell version
+      ansible.builtin.command: pwsh --version
+      register: powershell_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch latest PowerShell release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/PowerShell/PowerShell/releases/latest
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+          X-GitHub-Api-Version: "2022-11-28"
+          User-Agent: "ansible"
+      register: powershell_release
+      retries: 3
+      delay: 2
+      until: powershell_release.status == 200
+
+    - name: Set PowerShell release facts
+      ansible.builtin.set_fact:
+        powershell_target_version_raw: "{{ powershell_release.json.tag_name | default('') }}"
+        powershell_target_version: "{{ powershell_target_version_raw | regex_replace('^v','') }}"
+        powershell_asset: >-
+          {{
+            (powershell_release.json.assets | default([]))
+            | selectattr('name', 'search', 'linux-x64\\.tar\\.gz$')
+            | map(attribute='browser_download_url')
+            | list
+            | first
+            | default('', true)
+          }}
+        powershell_present: "{{ (powershell_version_check.rc | default(1)) == 0 }}"
+        powershell_present_version: >-
+          {{
+            (powershell_version_check.stdout | default(''))
+            | regex_replace('^PowerShell\\s+','')
+          }}
+        powershell_needs_install: >-
+          {{
+            (powershell_asset | length > 0) and
+            ( (not powershell_present) or
+              (powershell_target_version not in powershell_present_version) )
+          }}
+
+    - name: Download PowerShell release
+      ansible.builtin.get_url:
+        url: "{{ powershell_asset }}"
+        dest: /tmp/powershell.tar.gz
+        mode: "0644"
+      when: powershell_needs_install
+
+    - name: Ensure PowerShell installation directory
+      ansible.builtin.file:
+        path: /opt/microsoft/powershell/7
+        state: directory
+        mode: "0755"
+
+    - name: Extract PowerShell archive
+      ansible.builtin.unarchive:
+        src: /tmp/powershell.tar.gz
+        dest: /opt/microsoft/powershell/7
+        remote_src: true
+      when: powershell_needs_install
+
+    - name: Ensure pwsh binary is executable
+      ansible.builtin.file:
+        path: /opt/microsoft/powershell/7/pwsh
+        mode: "0755"
+        state: file
+      when: powershell_needs_install
+
+    - name: Symlink pwsh into PATH (only if present)
+      ansible.builtin.stat:
+        path: /opt/microsoft/powershell/7/pwsh
+      register: pwsh_stat
+
+    - name: Ensure PowerShell symlink exists
+      ansible.builtin.file:
+        src: /opt/microsoft/powershell/7/pwsh
+        dest: /usr/local/bin/pwsh
+        state: link
+        force: true
+      when: pwsh_stat.stat.exists
+
+    ###########################################################################
+    # btop
+    ###########################################################################
+    - name: Check current btop version
+      ansible.builtin.command: btop --version
+      register: btop_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch latest btop release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/aristocratos/btop/releases/latest
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+          X-GitHub-Api-Version: "2022-11-28"
+          User-Agent: "ansible"
+      register: btop_release
+      retries: 3
+      delay: 2
+      until: btop_release.status == 200
+
+    - name: Set btop release facts
+      ansible.builtin.set_fact:
+        btop_release_data: "{{ btop_release.json | default({}) }}"
+        btop_target_version_raw: "{{ btop_release_data.tag_name | default('') }}"
+        btop_target_version: "{{ btop_target_version_raw | regex_replace('^v','') }}"
+        btop_asset_list: >-
+          {{
+            btop_release_data.get('assets', [])
+            | selectattr('name','match','^btop-' ~ arch_cpu ~ '-linux-musl\\.tbz$')
+            | list
+          }}
+        btop_asset_url: "{{ btop_asset_list[0].browser_download_url if btop_asset_list|length > 0 else '' }}"
+        btop_present: "{{ (btop_version_check.rc | default(1)) == 0 }}"
+        btop_present_version: >-
+          {{
+            (btop_version_check.stdout | default(''))
+            | regex_search('([0-9]+(\\.[0-9]+)+)') | default('')
+          }}
+        btop_needs_install: >-
+          {{
+            (btop_asset_url | length > 0) and
+            ( (not btop_present) or
+              (btop_target_version != btop_present_version) )
+          }}
+
+    - name: Debug btop asset resolution (if missing)
+      ansible.builtin.debug:
+        msg: "Skipping btop install: no {{ arch_cpu }} linux-musl asset found in {{ btop_target_version_raw | default('unknown') }}"
+      when: btop_asset_url | length == 0
+
+    - name: Download btop release
+      ansible.builtin.get_url:
+        url: "{{ btop_asset_url }}"
+        dest: /tmp/btop.tbz
+        mode: "0644"
+      when: btop_needs_install
+
+    - name: Unpack btop release
+      ansible.builtin.unarchive:
+        src: /tmp/btop.tbz
+        dest: /tmp
+        remote_src: true
+      when: btop_needs_install
+
+    - name: Install btop
+      ansible.builtin.command:
+        cmd: ./install.sh --prefix /usr/local --silent
+        chdir: /tmp/btop
+        creates: /usr/local/bin/btop
+      when: btop_needs_install
+
+    - name: Remove btop build directory
+      ansible.builtin.file:
+        path: /tmp/btop
+        state: absent
+      when: btop_needs_install
+
+    ###########################################################################
+    # lsd
+    ###########################################################################
+    - name: Check current lsd version
+      ansible.builtin.command: lsd --version
+      register: lsd_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch latest lsd release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/lsd-rs/lsd/releases/latest
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+          X-GitHub-Api-Version: "2022-11-28"
+          User-Agent: "ansible"
+      register: lsd_release
+      retries: 3
+      delay: 2
+      until: lsd_release.status == 200
+
+    - name: Set lsd release facts
+      ansible.builtin.set_fact:
+        lsd_target_version_raw: "{{ lsd_release.json.tag_name | default('') }}"
+        lsd_target_version: "{{ lsd_target_version_raw | regex_replace('^v','') }}"
+        lsd_triple: "{{ arch_cpu ~ '-unknown-linux-gnu' }}"
+        lsd_asset_url: >-
+          {{
+            (lsd_release.json.assets | default([]))
+            | selectattr('name','match','^lsd-' ~ lsd_target_version ~ '-' ~ lsd_triple ~ '\\.tar\\.gz$')
+            | map(attribute='browser_download_url') | list | first | default('', true)
+          }}
+        lsd_present: "{{ (lsd_version_check.rc | default(1)) == 0 }}"
+        lsd_present_version: >-
+          {{ (lsd_version_check.stdout | default('')) | regex_search('([0-9]+(\\.[0-9]+)+)') | default('') }}
+        lsd_needs_install: >-
+          {{
+            (lsd_asset_url | length > 0) and
+            ( (not lsd_present) or (lsd_present_version != lsd_target_version) )
+          }}
+
+    - name: Download lsd release
+      ansible.builtin.get_url:
+        url: "{{ lsd_asset_url }}"
+        dest: /tmp/lsd.tar.gz
+        mode: "0644"
+      when: lsd_needs_install
+
+    - name: Unpack lsd release
+      ansible.builtin.unarchive:
+        src: /tmp/lsd.tar.gz
+        dest: /tmp
+        remote_src: true
+      when: lsd_needs_install
+
+    - name: Install lsd binary
+      ansible.builtin.copy:
+        src: "/tmp/lsd-{{ lsd_target_version }}-{{ lsd_triple }}/lsd"
+        dest: /usr/local/bin/lsd
+        mode: "0755"
+        remote_src: true
+      when: lsd_needs_install
+
+    - name: Remove lsd build directory
+      ansible.builtin.file:
+        path: "/tmp/lsd-{{ lsd_target_version }}-{{ lsd_triple }}"
+        state: absent
+      when: lsd_needs_install
+
+    ###########################################################################
+    # fzf
+    ###########################################################################
+    - name: Check current fzf version
+      ansible.builtin.command: fzf --version
+      register: fzf_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch latest fzf release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/junegunn/fzf/releases/latest
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+          X-GitHub-Api-Version: "2022-11-28"
+          User-Agent: "ansible"
+      register: fzf_release
+      retries: 3
+      delay: 2
+      until: fzf_release.status == 200
+
+    - name: Set fzf release facts
+      ansible.builtin.set_fact:
+        fzf_target_version_raw: "{{ fzf_release.json.tag_name | default('') }}"
+        fzf_target_version: "{{ fzf_target_version_raw | regex_replace('^v','') }}"
+        fzf_asset_url: >-
+          {{
+            (fzf_release.json.assets | default([]))
+            | selectattr('name', 'match', '^fzf-' ~ fzf_target_version ~ '-linux_' ~ arch_go ~ '\\.tar\\.gz$')
+            | map(attribute='browser_download_url') | list | first | default('', true)
+          }}
+        fzf_present: "{{ (fzf_version_check.rc | default(1)) == 0 }}"
+        fzf_present_version: >-
+          {{ (fzf_version_check.stdout | default('')) | regex_search('^([0-9]+(\\.[0-9]+)+)') | default('') }}
+        fzf_needs_install: >-
+          {{
+            (fzf_asset_url | length > 0) and
+            ( (not fzf_present) or (fzf_present_version != fzf_target_version) )
+          }}
+
+    - name: Download fzf release
+      ansible.builtin.get_url:
+        url: "{{ fzf_asset_url }}"
+        dest: /tmp/fzf.tar.gz
+        mode: "0644"
+      when: fzf_needs_install
+
+    - name: Unpack fzf release
+      ansible.builtin.unarchive:
+        src: /tmp/fzf.tar.gz
+        dest: /tmp
+        remote_src: true
+      when: fzf_needs_install
+
+    - name: Install fzf binary
+      ansible.builtin.copy:
+        src: /tmp/fzf
+        dest: /usr/local/bin/fzf
+        mode: "0755"
+        remote_src: true
+      when: fzf_needs_install
+
+    - name: Remove fzf build artifacts
+      ansible.builtin.file:
+        path: /tmp/fzf
+        state: absent
+      when: fzf_needs_install
+
+    ###########################################################################
+    # kitty
+    ###########################################################################
+    - name: Check current kitty version
+      ansible.builtin.command: kitty --version
+      register: kitty_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Decide if kitty needs install/upgrade
+      ansible.builtin.set_fact:
+        kitty_needs_install: "{{ (kitty_version_check.rc | default(1)) != 0 }}"
+
+    - name: Download kitty installer script
+      ansible.builtin.get_url:
+        url: https://sw.kovidgoyal.net/kitty/installer.sh
+        dest: /tmp/kitty-installer.sh
+        mode: "0755"
+      when: kitty_needs_install
+
+    - name: Install kitty from upstream
+      ansible.builtin.command:
+        cmd: /tmp/kitty-installer.sh dest=/opt/kitty launch=n
+        creates: /opt/kitty/bin/kitty
+      when: kitty_needs_install
+
+    - name: Check installed kitty binary
+      ansible.builtin.stat:
+        path: /opt/kitty/bin/kitty
+      register: kitty_bin_stat
+
+    - name: Ensure kitty binary symlink exists (only if present)
+      ansible.builtin.file:
+        src: /opt/kitty/bin/kitty
+        dest: /usr/local/bin/kitty
+        state: link
+        force: true
+      when: kitty_bin_stat.stat.exists
+
+    - name: Clean kitty installer script
+      ansible.builtin.file:
+        path: /tmp/kitty-installer.sh
+        state: absent
+      when: kitty_needs_install
+
+    ###########################################################################
+    # mosh (build from source)
+    ###########################################################################
+    - name: Check current mosh version
+      ansible.builtin.command: mosh --version
+      register: mosh_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch latest mosh release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/mobile-shell/mosh/releases/latest
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+          X-GitHub-Api-Version: "2022-11-28"
+          User-Agent: "ansible"
+      register: mosh_release
+      retries: 3
+      delay: 2
+      until: mosh_release.status == 200
+
+    - name: Set mosh release facts
+      ansible.builtin.set_fact:
+        mosh_target_version_raw: "{{ mosh_release.json.tag_name | default('') }}"
+        mosh_target_version: "{{ mosh_target_version_raw | regex_replace('^v','') }}"
+        mosh_asset_url: >-
+          {{
+            (mosh_release.json.assets | default([]))
+            | selectattr('name', 'match', '^mosh-' ~ mosh_target_version ~ '\\.tar\\.gz$')
+            | map(attribute='browser_download_url') | list | first | default('', true)
+          }}
+        mosh_present: "{{ (mosh_version_check.rc | default(1)) == 0 }}"
+        mosh_present_version: >-
+          {{ (mosh_version_check.stdout | default('')) | regex_search('([0-9]+(\\.[0-9]+)+)') | default('') }}
+        mosh_needs_install: >-
+          {{
+            (mosh_asset_url | length > 0) and
+            ( (not mosh_present) or (mosh_present_version != mosh_target_version) )
+          }}
+
+    - name: Download mosh release
+      ansible.builtin.get_url:
+        url: "{{ mosh_asset_url }}"
+        dest: /tmp/mosh.tar.gz
+        mode: "0644"
+      when: mosh_needs_install
+
+    - name: Unpack mosh release
+      ansible.builtin.unarchive:
+        src: /tmp/mosh.tar.gz
+        dest: /tmp
+        remote_src: true
+      when: mosh_needs_install
+
+    - name: Configure mosh
+      ansible.builtin.command:
+        cmd: ./configure --prefix=/usr/local
+        chdir: "/tmp/mosh-{{ mosh_target_version }}"
+        creates: "/tmp/mosh-{{ mosh_target_version }}/config.status"
+      when: mosh_needs_install
+
+    - name: Build mosh
+      ansible.builtin.command:
+        cmd: make -j{{ ansible_facts.processor_vcpus | default(ansible_facts.processor_count | default(1)) }}
+        chdir: "/tmp/mosh-{{ mosh_target_version }}"
+        creates: "/tmp/mosh-{{ mosh_target_version }}/src/frontend/mosh"
+      when: mosh_needs_install
+
+    - name: Install mosh
+      ansible.builtin.command:
+        cmd: make install
+        chdir: "/tmp/mosh-{{ mosh_target_version }}"
+        creates: /usr/local/bin/mosh
+      when: mosh_needs_install
+
+    - name: Remove mosh build directory
+      ansible.builtin.file:
+        path: "/tmp/mosh-{{ mosh_target_version }}"
+        state: absent
+      when: mosh_needs_install
+
+    ###########################################################################
+    # yt-dlp (static binary)
+    ###########################################################################
+    - name: Check current yt-dlp version
+      ansible.builtin.command: yt-dlp --version
+      register: ytdlp_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fetch latest yt-dlp release metadata
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest
+        return_content: true
+        headers:
+          Accept: application/vnd.github+json
+          X-GitHub-Api-Version: "2022-11-28"
+          User-Agent: "ansible"
+      register: ytdlp_release
+      retries: 3
+      delay: 2
+      until: ytdlp_release.status == 200
+
+    - name: Set yt-dlp release facts
+      ansible.builtin.set_fact:
+        ytdlp_target_version: "{{ ytdlp_release.json.tag_name | default('') | regex_replace('^v','') }}"
+        ytdlp_asset_url: >-
+          {{
+            (ytdlp_release.json.assets | default([]))
+            | selectattr('name','equalto','yt-dlp')
+            | map(attribute='browser_download_url') | list | first | default('', true)
+          }}
+        ytdlp_present: "{{ (ytdlp_version_check.rc | default(1)) == 0 }}"
+        ytdlp_present_version: "{{ ytdlp_version_check.stdout | default('') }}"
+        ytdlp_needs_install: >-
+          {{
+            (ytdlp_asset_url | length > 0) and
+            ( (not ytdlp_present) or (ytdlp_target_version not in ytdlp_present_version) )
+          }}
+
+    - name: Download yt-dlp release (install/upgrade)
+      ansible.builtin.get_url:
+        url: "{{ ytdlp_asset_url }}"
+        dest: /usr/local/bin/yt-dlp
+        mode: "0755"
+      when: ytdlp_needs_install
+
   when: ansible_facts.os_family == "Debian"
 
-- name: Install build dependencies for mosh
-  ansible.builtin.apt:
-    name:
-      - protobuf-compiler
-      - libprotobuf-dev
-      - pkg-config
-      - libutempter-dev
-      - libncurses-dev
-      - zlib1g-dev
-      - autoconf
-      - automake
-      - libtool
-      - libssl-dev
-    state: present
-  when: ansible_facts.os_family == "Debian"
-
-- name: Ensure ansible is installed with pipx
-  community.general.pipx:
-    name: ansible
-    state: latest
-  when: ansible_facts.os_family == "Debian"
-
-- name: Link ansible pipx binaries into /usr/local/bin
-  ansible.builtin.file:
-    src: "/root/.local/pipx/venvs/ansible/bin/{{ item }}"
-    dest: "/usr/local/bin/{{ item }}"
-    state: link
-    force: true
-  loop:
-    - ansible
-    - ansible-playbook
-    - ansible-config
-    - ansible-galaxy
-  when: ansible_facts.os_family == "Debian"
-
-- name: Check current PowerShell version
-  ansible.builtin.command: pwsh --version
-  register: powershell_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
-- name: Fetch latest PowerShell release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/PowerShell/PowerShell/releases/latest
-    return_content: true
-  register: powershell_release
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set PowerShell release facts
-  ansible.builtin.set_fact:
-    powershell_target_version: "{{ powershell_release.json.tag_name }}"
-    powershell_asset: >-
-      {{
-        (
-          powershell_release.json.assets
-          | selectattr('name', 'search', 'linux-x64\.tar\.gz$')
-          | map(attribute='browser_download_url')
-          | list
-          | first
-        )
-        | default('', true)
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Download PowerShell release
-  ansible.builtin.get_url:
-    url: "{{ powershell_asset }}"
-    dest: /tmp/powershell.tar.gz
-    mode: "0644"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_asset | length > 0
-    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
-
-- name: Create PowerShell installation directory
-  ansible.builtin.file:
-    path: /opt/microsoft/powershell
-    state: directory
-    mode: "0755"
-  when: ansible_facts.os_family == "Debian"
-
-- name: Extract PowerShell archive
-  ansible.builtin.unarchive:
-    src: /tmp/powershell.tar.gz
-    dest: /opt/microsoft/powershell
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_asset | length > 0
-    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
-
-- name: Ensure PowerShell symlink exists
-  ansible.builtin.file:
-    src: /opt/microsoft/powershell/pwsh
-    dest: /usr/local/bin/pwsh
-    state: link
-    force: true
-  when: ansible_facts.os_family == "Debian"
-
-- name: Check current btop version
-  ansible.builtin.command: btop --version
-  register: btop_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
-- name: Fetch latest btop release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/aristocratos/btop/releases/latest
-    return_content: true
-  register: btop_release
-  when: ansible_facts.os_family == "Debian"
-
-- name: Normalize btop release data
-  ansible.builtin.set_fact:
-    btop_release_data: "{{ btop_release.json | default({}) }}"
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set btop release facts
-  ansible.builtin.set_fact:
-    btop_target_version: "{{ btop_release_data.tag_name | default('') }}"
-    btop_arch: >-
-      {{
-        'x86_64' if ansible_facts.architecture in ['x86_64', 'amd64'] else
-        'aarch64' if ansible_facts.architecture in ['aarch64', 'arm64'] else
-        ansible_facts.architecture
-      }}
-    btop_asset_list: >-
-      {{
-        btop_release_data.get('assets', [])
-        | selectattr('name', 'match', '^btop-' ~ btop_arch ~ '-linux-musl\\.tbz$')
-        | list
-      }}
-    btop_asset_url: >-
-      {{ btop_asset_list[0].browser_download_url if btop_asset_list | length > 0 else '' }}
-    btop_version_present: "{{ (btop_version_check.rc | default(1)) == 0 }}"
-    btop_needs_install: >-
-      {{
-        (btop_asset_url | length > 0) and (
-          (not btop_version_present) or (
-            btop_target_version not in (btop_version_check.stdout | default(''))
-          )
-        )
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Debug btop asset resolution
-  ansible.builtin.debug:
-    msg: "Skipping btop install: no {{ btop_arch }} asset found in {{ btop_release_data.tag_name | default('unknown') }}"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - btop_asset_url | length == 0
-
-- name: Download btop release
-  ansible.builtin.get_url:
-    url: "{{ btop_asset_url }}"
-    dest: /tmp/btop.tbz
-    mode: "0644"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - btop_needs_install
-
-- name: Unpack btop release
-  ansible.builtin.unarchive:
-    src: /tmp/btop.tbz
-    dest: /tmp
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - btop_needs_install
-
-- name: Install btop
-  ansible.builtin.command:
-    cmd: ./install.sh --prefix /usr/local --silent
-    chdir: /tmp/btop
-    creates: /usr/local/bin/btop
-  when:
-    - ansible_facts.os_family == "Debian"
-    - btop_needs_install
-
-- name: Remove btop build directory
-  ansible.builtin.file:
-    path: /tmp/btop
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - btop_needs_install
-
-- name: Check current lsd version
-  ansible.builtin.command: lsd --version
-  register: lsd_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
-- name: Fetch latest lsd release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/lsd-rs/lsd/releases/latest
-    return_content: true
-  register: lsd_release
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set lsd release facts
-  ansible.builtin.set_fact:
-    lsd_target_version: "{{ lsd_release.json.tag_name }}"
-    lsd_asset_url: >-
-      {{
-        (
-          lsd_release.json.assets
-          | selectattr('name', 'search', 'lsd-.*-x86_64-unknown-linux-gnu\\.tar\\.gz$')
-          | map(attribute='browser_download_url')
-          | list
-          | first
-        )
-        | default('', true)
-      }}
-    lsd_needs_install: >-
-      {{
-        lsd_asset_url | length > 0 and
-        (
-          lsd_version_check.stdout is not defined or
-          lsd_target_version not in lsd_version_check.stdout
-        )
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Download lsd release
-  ansible.builtin.get_url:
-    url: "{{ lsd_asset_url }}"
-    dest: /tmp/lsd.tar.gz
-    mode: "0644"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
-
-- name: Unpack lsd release
-  ansible.builtin.unarchive:
-    src: /tmp/lsd.tar.gz
-    dest: /tmp
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
-
-- name: Install lsd binary
-  ansible.builtin.copy:
-    src: "/tmp/{{ (lsd_release.json.tag_name | regex_replace('^v', 'lsd-')) }}-x86_64-unknown-linux-gnu/lsd"
-    dest: /usr/local/bin/lsd
-    mode: "0755"
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
-
-- name: Remove lsd build directory
-  ansible.builtin.file:
-    path: "/tmp/{{ (lsd_release.json.tag_name | regex_replace('^v', 'lsd-')) }}-x86_64-unknown-linux-gnu"
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
-
-- name: Check current fzf version
-  ansible.builtin.command: fzf --version
-  register: fzf_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
-- name: Fetch latest fzf release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/junegunn/fzf/releases/latest
-    return_content: true
-  register: fzf_release
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set fzf release facts
-  ansible.builtin.set_fact:
-    fzf_target_version: "{{ fzf_release.json.tag_name }}"
-    fzf_asset_url: >-
-      {{
-        (
-          fzf_release.json.assets
-          | selectattr('name', 'search', 'fzf-.*-linux_amd64\\.tar\\.gz$')
-          | map(attribute='browser_download_url')
-          | list
-          | first
-        )
-        | default('', true)
-      }}
-    fzf_needs_install: >-
-      {{
-        fzf_asset_url | length > 0 and
-        (
-          fzf_version_check.stdout is not defined or
-          fzf_target_version not in fzf_version_check.stdout
-        )
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Download fzf release
-  ansible.builtin.get_url:
-    url: "{{ fzf_asset_url }}"
-    dest: /tmp/fzf.tar.gz
-    mode: "0644"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
-
-- name: Unpack fzf release
-  ansible.builtin.unarchive:
-    src: /tmp/fzf.tar.gz
-    dest: /tmp
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
-
-- name: Install fzf binary
-  ansible.builtin.copy:
-    src: /tmp/fzf
-    dest: /usr/local/bin/fzf
-    mode: "0755"
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
-
-- name: Remove fzf build artifacts
-  ansible.builtin.file:
-    path: /tmp/fzf
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
-
-- name: Check current kitty version
-  ansible.builtin.command: kitty --version
-  register: kitty_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
-- name: Fetch latest kitty release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/kovidgoyal/kitty/releases/latest
-    return_content: true
-  register: kitty_release
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set kitty release facts
-  ansible.builtin.set_fact:
-    kitty_target_version: "{{ kitty_release.json.tag_name }}"
-    kitty_asset_url: >-
-      {{
-        (
-          kitty_release.json.assets
-          | selectattr('name', 'search', 'kitty-.*-x86_64\\.txz$')
-          | map(attribute='browser_download_url')
-          | list
-          | first
-        )
-        | default('', true)
-      }}
-    kitty_needs_install: >-
-      {{
-        kitty_asset_url | length > 0 and
-        (
-          kitty_version_check.stdout is not defined or
-          kitty_target_version not in kitty_version_check.stdout
-        )
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Download kitty installer script
-  ansible.builtin.get_url:
-    url: https://sw.kovidgoyal.net/kitty/installer.sh
-    dest: /tmp/kitty-installer.sh
-    mode: "0755"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
-
-- name: Install kitty from upstream
-  ansible.builtin.command:
-    cmd: /tmp/kitty-installer.sh dest=/opt/kitty launch=n
-    creates: /opt/kitty/bin/kitty
-  when:
-    - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
-
-- name: Ensure kitty binary symlink exists
-  ansible.builtin.file:
-    src: /opt/kitty/bin/kitty
-    dest: /usr/local/bin/kitty
-    state: link
-    force: true
-  when: ansible_facts.os_family == "Debian"
-
-- name: Clean kitty installer script
-  ansible.builtin.file:
-    path: /tmp/kitty-installer.sh
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
-
-- name: Check current mosh version
-  ansible.builtin.command: mosh --version
-  register: mosh_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
-- name: Fetch latest mosh release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/mobile-shell/mosh/releases/latest
-    return_content: true
-  register: mosh_release
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set mosh release facts
-  ansible.builtin.set_fact:
-    mosh_target_version: "{{ mosh_release.json.tag_name }}"
-    mosh_asset_url: >-
-      {{
-        (
-          mosh_release.json.assets
-          | selectattr('name', 'search', 'mosh-.*\\.tar\\.gz$')
-          | map(attribute='browser_download_url')
-          | list
-          | first
-        )
-        | default('', true)
-      }}
-    mosh_needs_install: >-
-      {{
-        mosh_asset_url | length > 0 and
-        (
-          mosh_version_check.stdout is not defined or
-          mosh_target_version not in mosh_version_check.stdout
-        )
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Download mosh release
-  ansible.builtin.get_url:
-    url: "{{ mosh_asset_url }}"
-    dest: /tmp/mosh.tar.gz
-    mode: "0644"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
-
-- name: Unpack mosh release
-  ansible.builtin.unarchive:
-    src: /tmp/mosh.tar.gz
-    dest: /tmp
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
-
-- name: Configure mosh
-  ansible.builtin.command:
-    cmd: ./configure --prefix=/usr/local
-    chdir: "/tmp/mosh-{{ mosh_target_version | regex_replace('^v', '') }}"
-    creates: "/tmp/mosh-{{ mosh_target_version | regex_replace('^v', '') }}/config.status"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
-
-- name: Build mosh
-  ansible.builtin.command:
-    cmd: make -j{{ ansible_facts.processor_vcpus | default(ansible_facts.processor_count | default(1)) }}
-    chdir: "/tmp/mosh-{{ mosh_target_version | regex_replace('^v', '') }}"
-    creates: "/tmp/mosh-{{ mosh_target_version | regex_replace('^v', '') }}/src/frontend/mosh"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
-
-- name: Install mosh
-  ansible.builtin.command:
-    cmd: make install
-    chdir: "/tmp/mosh-{{ mosh_target_version | regex_replace('^v', '') }}"
-    creates: /usr/local/bin/mosh
-  when:
-    - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
-
-- name: Remove mosh build directory
-  ansible.builtin.file:
-    path: "/tmp/mosh-{{ mosh_target_version | regex_replace('^v', '') }}"
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
-
-- name: Check current yt-dlp version
-  ansible.builtin.command: yt-dlp --version
-  register: ytdlp_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
-- name: Fetch latest yt-dlp release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest
-    return_content: true
-  register: ytdlp_release
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set yt-dlp release facts
-  ansible.builtin.set_fact:
-    ytdlp_target_version: "{{ ytdlp_release.json.tag_name }}"
-    ytdlp_asset_url: >-
-      {{
-        (
-          ytdlp_release.json.assets
-          | selectattr('name', 'equalto', 'yt-dlp')
-          | map(attribute='browser_download_url')
-          | list
-          | first
-        )
-        | default('', true)
-      }}
-    ytdlp_needs_install: >-
-      {{
-        ytdlp_asset_url | length > 0 and
-        (
-          ytdlp_version_check.stdout is not defined or
-          ytdlp_target_version not in ytdlp_version_check.stdout
-        )
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Download yt-dlp release
-  ansible.builtin.get_url:
-    url: "{{ ytdlp_asset_url }}"
-    dest: /usr/local/bin/yt-dlp
-    mode: "0755"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - ytdlp_needs_install
