@@ -103,6 +103,10 @@ ensure_chezmoi() {
 }
 
 clone_repo() {
+  if command_exists git; then
+    git config --global --add safe.directory "$WORKDIR" || true
+    git config --global --add safe.directory "$PWD" || true
+  fi
   ensure_directory "$(dirname "$WORKDIR")"
   if [ -d "$WORKDIR/.git" ]; then
     log "Updating repository in $WORKDIR"
