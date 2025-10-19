@@ -21,3 +21,4 @@ common_core_brew_packages:
   - yt-dlp
   - mosh
   - powershell
+  - zip
