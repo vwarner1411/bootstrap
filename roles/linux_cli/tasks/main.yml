@@ -13,26 +13,48 @@
   when: ansible_facts.os_family == "Debian"
 
 
-- name: Ensure Microsoft repository package is downloaded
+- name: Ensure Microsoft repository packages directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
+
+- name: Download Microsoft GPG key
   ansible.builtin.get_url:
-    url: "https://packages.microsoft.com/config/ubuntu/{{ ansible_facts.distribution_version }}/packages-microsoft-prod.deb"
-    dest: /tmp/packages-microsoft-prod.deb
+    url: https://packages.microsoft.com/keys/microsoft.asc
+    dest: /etc/apt/keyrings/microsoft.asc
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
     - ansible_facts.distribution == "Ubuntu"
 
-- name: Install Microsoft repository package
-  ansible.builtin.apt:
-    deb: /tmp/packages-microsoft-prod.deb
+- name: De-armor Microsoft GPG key
+  ansible.builtin.command: gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg /etc/apt/keyrings/microsoft.asc
+  args:
+    creates: /etc/apt/keyrings/microsoft.gpg
   when:
     - ansible_facts.os_family == "Debian"
     - ansible_facts.distribution == "Ubuntu"
 
-- name: Remove Microsoft repository package download
+- name: Remove ASCII Microsoft key
   ansible.builtin.file:
-    path: /tmp/packages-microsoft-prod.deb
+    path: /etc/apt/keyrings/microsoft.asc
     state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
+
+- name: Configure Microsoft package repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg]
+      https://packages.microsoft.com/repos/microsoft-ubuntu-{{ ansible_distribution_release }}-prod
+      {{ ansible_distribution_release }} main
+    filename: microsoft-prod
+    state: present
   when:
     - ansible_facts.os_family == "Debian"
     - ansible_facts.distribution == "Ubuntu"
