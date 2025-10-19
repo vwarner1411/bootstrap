@@ -55,40 +55,21 @@
   register: powershell_release
   when: ansible_facts.os_family == "Debian"
 
-- name: Normalize PowerShell release data
-  ansible.builtin.set_fact:
-    powershell_release_data: "{{ powershell_release.json | default({}) }}"
-  when: ansible_facts.os_family == "Debian"
-
-- name: Collect PowerShell asset list
-  ansible.builtin.set_fact:
-    powershell_asset_list: "{{ powershell_release_data.get('assets', []) | selectattr('name', 'search', 'linux-x64\\.tar\\.gz$') | list }}"
-  when: ansible_facts.os_family == "Debian"
-
 - name: Set PowerShell release facts
   ansible.builtin.set_fact:
-    powershell_target_version: "{{ powershell_release_data.tag_name | default('') }}"
-    powershell_asset: "{{ powershell_asset_list[0].browser_download_url if powershell_asset_list | length > 0 else '' }}"
-    powershell_present: "{{ (powershell_version_check.rc | default(1)) == 0 }}"
-    powershell_needs_install: >-
+    powershell_target_version: "{{ powershell_release.json.tag_name }}"
+    powershell_asset: >-
       {{
-        (powershell_asset | length > 0)
-        and (
-          (not powershell_present)
-          or (
-            powershell_target_version
-            not in (powershell_version_check.stdout | default(''))
-          )
+        (
+          powershell_release.json.assets
+          | selectattr('name', 'search', 'linux-x64\.tar\.gz$')
+          | map(attribute='browser_download_url')
+          | list
+          | first
         )
+        | default('', true)
       }}
   when: ansible_facts.os_family == "Debian"
-
-- name: Debug PowerShell asset resolution
-  ansible.builtin.debug:
-    msg: "Skipping PowerShell install: no linux-x64 asset found in {{ powershell_release_data.tag_name | default('unknown') }}"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_asset | length == 0
 
 - name: Download PowerShell release
   ansible.builtin.get_url:
@@ -97,42 +78,33 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
+    - powershell_asset | length > 0
+    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
 
 - name: Create PowerShell installation directory
   ansible.builtin.file:
-    path: /opt/microsoft/powershell/7
+    path: /opt/microsoft/powershell
     state: directory
     mode: "0755"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
+  when: ansible_facts.os_family == "Debian"
 
 - name: Extract PowerShell archive
   ansible.builtin.unarchive:
     src: /tmp/powershell.tar.gz
-    dest: /opt/microsoft/powershell/7
+    dest: /opt/microsoft/powershell
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
-
-- name: Check extracted pwsh path
-  ansible.builtin.stat:
-    path: /opt/microsoft/powershell/7/pwsh
-  register: pwsh_stat
-  when: ansible_facts.os_family == "Debian"
+    - powershell_asset | length > 0
+    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
 
 - name: Ensure PowerShell symlink exists
   ansible.builtin.file:
-    src: /opt/microsoft/powershell/7/pwsh
+    src: /opt/microsoft/powershell/pwsh
     dest: /usr/local/bin/pwsh
     state: link
     force: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
-    - pwsh_stat.stat.exists
+  when: ansible_facts.os_family == "Debian"
 
 - name: Check current btop version
   ansible.builtin.command: btop --version
