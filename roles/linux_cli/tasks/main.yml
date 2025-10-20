@@ -59,103 +59,55 @@
   when: ansible_facts.os_family == "Debian"
 
 # PowerShell ###################################################################
-- name: Check current PowerShell version
-  ansible.builtin.command: pwsh --version
-  register: powershell_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian"
-
 - name: Fetch latest PowerShell release metadata
   ansible.builtin.uri:
     url: https://api.github.com/repos/PowerShell/PowerShell/releases/latest
     return_content: true
-    headers:
-      Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
   register: powershell_release
-  retries: 3
-  delay: 2
-  until: powershell_release.status == 200
   when: ansible_facts.os_family == "Debian"
 
 - name: Set PowerShell release facts
   ansible.builtin.set_fact:
-    powershell_target_version_raw: "{{ powershell_release.json.tag_name | default('') }}"
-    powershell_target_version: "{{ powershell_target_version_raw | regex_replace('^v', '') }}"
+    powershell_target_version: "{{ powershell_release.json.tag_name }}"
     powershell_asset: >-
       {{
-        (powershell_release.json.assets | default([]))
-        | selectattr('name', 'search', 'linux-x64\\.tar\\.gz$')
-        | map(attribute='browser_download_url')
-        | list
-        | first
-        | default('', true)
-      }}
-    powershell_present: "{{ (powershell_version_check.rc | default(1)) == 0 }}"
-    powershell_present_version: >-
-      {{
-        (powershell_version_check.stdout | default(''))
-        | regex_search('([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    powershell_needs_install: >-
-      {{
-        (powershell_asset | length > 0) and
         (
-          (not powershell_present) or
-          (powershell_present_version != powershell_target_version)
+          powershell_release.json.assets
+          | selectattr('name', 'search', 'linux-x64\.tar\.gz$')
+          | map(attribute='browser_download_url')
+          | list
+          | first
         )
+        | default('', true)
       }}
   when: ansible_facts.os_family == "Debian"
 
 - name: Download PowerShell release
   ansible.builtin.get_url:
     url: "{{ powershell_asset }}"
-    dest: "{{ linux_cli_download_dir }}/powershell.tar.gz"
+    dest: /tmp/powershell.tar.gz
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
+    - powershell_asset | length > 0
+    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
 
-- name: Ensure PowerShell version directory exists
+- name: Create PowerShell installation directory
   ansible.builtin.file:
-    path: "/opt/microsoft/powershell-{{ powershell_target_version }}"
+    path: /opt/microsoft/powershell
     state: directory
     mode: "0755"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
+  when: ansible_facts.os_family == "Debian"
 
 - name: Extract PowerShell archive
   ansible.builtin.unarchive:
-    src: "{{ linux_cli_download_dir }}/powershell.tar.gz"
-    dest: "/opt/microsoft/powershell-{{ powershell_target_version }}"
-    remote_src: true
-    extra_opts:
-      - "--strip-components=1"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
-
-- name: Update PowerShell current symlink
-  ansible.builtin.file:
-    src: "/opt/microsoft/powershell-{{ powershell_target_version }}"
+    src: /tmp/powershell.tar.gz
     dest: /opt/microsoft/powershell
-    state: link
-    force: true
+    remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
-
-- name: Ensure PowerShell binary permissions
-  ansible.builtin.file:
-    path: /opt/microsoft/powershell/pwsh
-    state: file
-    mode: "0755"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
+    - powershell_asset | length > 0
+    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
 
 - name: Ensure PowerShell symlink exists
   ansible.builtin.file:
@@ -163,17 +115,7 @@
     dest: /usr/local/bin/pwsh
     state: link
     force: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - (powershell_needs_install or powershell_present)
-
-- name: Clean PowerShell archive
-  ansible.builtin.file:
-    path: "{{ linux_cli_download_dir }}/powershell.tar.gz"
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - powershell_needs_install
+  when: ansible_facts.os_family == "Debian"
 
 # kitty ########################################################################
 - name: Check current kitty version
