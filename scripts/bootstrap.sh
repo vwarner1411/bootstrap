@@ -187,7 +187,8 @@ run_chezmoi() {
 
 install_collections() {
   log "Installing Ansible collections"
-  ansible-galaxy collection install -r "$WORKDIR/requirements.yml" --force
+  ensure_directory "$WORKDIR/collections"
+  ansible-galaxy collection install -r "$WORKDIR/requirements.yml" --force -p "$WORKDIR/collections"
 }
 
 run_playbook() {
