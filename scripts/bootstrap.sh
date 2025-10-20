@@ -7,6 +7,9 @@ CHEZMOI_REPO="${CHEZMOI_REPO:-https://github.com/vwarner1411/dotfiles.git}"
 WORKDIR="${WORKDIR:-$HOME/.local/share/zshell}"
 PROFILE="${PROFILE:-desktop}"
 
+# ensure local bin is first so freshly installed tools are visible
+export PATH="$HOME/.local/bin:$PATH"
+
 log() {
   printf "\033[1;32m[bootstrap]\033[0m %s\n" "$*" >&2
 }
@@ -53,6 +56,28 @@ ensure_prereqs_linux() {
     software-properties-common
 }
 
+github_latest_tag() {
+  local repo="$1"
+  python3 - "$repo" <<'PY'
+import json
+import sys
+import urllib.request
+
+repo = sys.argv[1]
+url = f"https://api.github.com/repos/{repo}/releases/latest"
+req = urllib.request.Request(url, headers={
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "zshell-bootstrap"
+})
+with urllib.request.urlopen(req) as resp:
+    data = json.load(resp)
+tag = data.get("tag_name", "")
+if not tag:
+    raise SystemExit("unable to determine latest release tag")
+print(tag)
+PY
+}
+
 ensure_prereqs_macos() {
   if ! command_exists xcode-select; then
     err "Developer tools (xcode-select) not available; install manually before running."
@@ -73,13 +98,35 @@ ensure_prereqs_macos() {
 }
 
 ensure_ansible_linux() {
-  if ! command_exists ansible; then
-    log "Installing Ansible through apt"
-    sudo apt-get install -y ansible
-  else
-    log "Upgrading Ansible through apt"
-    sudo apt-get install -y ansible
+  local latest_tag
+  latest_tag="$(github_latest_tag "ansible/ansible" | tr -d '\n')"
+  local latest_clean="${latest_tag#v}"
+  local current_version=""
+  if command_exists ansible; then
+    current_version="$(ansible --version 2>/dev/null | awk 'NR==1 {print $2}' | sed 's/^v//')"
   fi
+  if [ -n "$current_version" ] && [ "$current_version" = "$latest_clean" ]; then
+    log "Ansible ${latest_clean} already installed"
+    return
+  fi
+
+  local venv_dir="$HOME/.local/share/ansible-venv"
+  local bin_dir="$HOME/.local/bin"
+  ensure_directory "$bin_dir"
+  ensure_directory "$venv_dir"
+
+  if [ ! -e "$venv_dir/bin/python" ]; then
+    python3 -m venv "$venv_dir"
+  fi
+
+  "$venv_dir/bin/python" -m pip install --upgrade pip setuptools wheel
+  "$venv_dir/bin/python" -m pip install --upgrade "https://github.com/ansible/ansible/archive/refs/tags/${latest_tag}.tar.gz"
+
+  for tool in ansible ansible-playbook ansible-galaxy ansible-config; do
+    ln -sf "$venv_dir/bin/$tool" "$bin_dir/$tool"
+  done
+
+  log "Installed Ansible ${latest_clean} from GitHub releases"
 }
 
 ensure_ansible_macos() {
@@ -97,8 +144,11 @@ ensure_chezmoi() {
     log "chezmoi already installed"
     return
   fi
-  log "Installing chezmoi"
-  sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
+  log "Installing chezmoi from upstream script"
+  if ! sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"; then
+    err "chezmoi installation failed"
+    exit 1
+  fi
   export PATH="$HOME/.local/bin:$PATH"
 }
 
@@ -177,5 +227,3 @@ main() {
 }
 
 main "$@"
-# ensure user bin is on PATH early
-export PATH="$HOME/.local/bin:$PATH"

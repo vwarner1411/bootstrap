@@ -1,5 +1,0 @@
-collections/
-.molecule/
-__pycache__/
-*.retry
-.DS_Store

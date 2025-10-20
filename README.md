@@ -27,12 +27,12 @@ Re-run the same command any time to upgrade packages and reapply dotfiles.
 | Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
 |---------------------|-----------------------------------------------|-------------------------------------------------------------------|
 | Core CLI            | git, curl, wget, rsync, jq, ncdu, tree, lynx  | Same set using `apt`, plus python3/pip, build-essential, sysstat  |
-| Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned via Git, Oh My Zsh from upstream       |
-| Prompt/UX           | starship, lsd, yazi, fzf, btop, kitty         | apt for btop/lsd/fzf/kitty, GitHub releases for starship & yazi   |
-| Development         | neovim, mosh, ansible, Powershell, yt-dlp     | ansible/mosh/yt-dlp via apt, Powershell via Microsoft repo        |
+| Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autocomplete, syntax-highlighting) |
+| Prompt/UX           | starship, lsd, yazi, fzf, btop, kitty         | Latest GitHub releases for starship, lsd, yazi, fzf, btop, kitty  |
+| Development         | neovim, mosh, ansible, Powershell, yt-dlp     | Latest GitHub releases for Ansible CLI, mosh, PowerShell, yt-dlp  |
 | Dotfiles            | Managed via `chezmoi init --apply`            | Same dotfiles source                                              |
 
-Linux nodes never rely on Homebrew; everything comes from apt or upstream releases.
+Linux nodes never rely on Homebrew; developer tooling comes straight from GitHub releases (apt is only used for core OS/build dependencies).
 
 ## Project Layout
 
@@ -43,7 +43,7 @@ Linux nodes never rely on Homebrew; everything comes from apt or upstream releas
 ├── requirements.yml
 ├── roles/
 │   ├── common_core/        # shared baseline
-│   ├── linux_cli/          # apt + GitHub releases
+│   ├── linux_cli/          # GitHub releases + minimal apt build deps
 │   ├── macos_cli/          # Homebrew formulas/casks
 │   ├── shell_extras/       # oh-my-zsh and plugins
 │   └── desktop_tools/      # desktop-only extras

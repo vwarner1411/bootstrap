@@ -1,9 +1,14 @@
 - name: Install desktop packages on Debian
   ansible.builtin.apt:
     name:
-      - kitty
       - fonts-firacode
     state: present
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check kitty desktop entry availability
+  ansible.builtin.stat:
+    path: /opt/kitty/share/applications/kitty.desktop
+  register: kitty_desktop_entry
   when: ansible_facts.os_family == "Debian"
 
 - name: Ensure kitty desktop entry symlink exists
@@ -14,6 +19,7 @@
     force: true
   when:
     - ansible_facts.os_family == "Debian"
+    - kitty_desktop_entry.stat.exists
     - (ansible_facts.get('distribution_major_version', '0') | int) >= 24
 
 - name: Check for oh-my-zsh custom directory
