@@ -134,6 +134,13 @@
     - powershell_asset | length > 0
     - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
 
+- name: Ensure PowerShell binary is executable
+  ansible.builtin.file:
+    path: /opt/microsoft/powershell/pwsh
+    mode: "0755"
+    state: file
+  when: ansible_facts.os_family == "Debian"
+
 - name: Ensure PowerShell symlink exists
   ansible.builtin.file:
     src: /opt/microsoft/powershell/pwsh
@@ -202,7 +209,7 @@
     kitty_asset: >-
       {{
         (kitty_release.json.assets | default([]))
-        | selectattr('name', 'match', '^kitty-' ~ kitty_target_version ~ '-' ~ arch_cpu ~ '\\.txz$')
+        | selectattr('name', 'equalto', 'kitty-' ~ kitty_target_version ~ '-' ~ arch_cpu ~ '.txz')
         | map(attribute='browser_download_url')
         | list
         | first
