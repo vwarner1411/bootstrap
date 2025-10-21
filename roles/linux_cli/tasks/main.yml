@@ -430,9 +430,10 @@
 
 - name: Install btop
   ansible.builtin.command:
-    cmd: ./install.sh --prefix /usr/local --silent
+    cmd: make install PREFIX=/usr/local
     chdir: "{{ linux_cli_download_dir }}/btop"
-  changed_when: true
+  args:
+    creates: /usr/local/bin/btop
   when:
     - ansible_facts.os_family == "Debian"
     - btop_install_required
