@@ -28,9 +28,19 @@
   register: ohmyzsh_custom_dir
   become: false
 
+- name: Check for starship binary
+  ansible.builtin.command: starship --version
+  register: starship_cli_check
+  changed_when: false
+  failed_when: false
+  become: false
+  when: ohmyzsh_custom_dir.stat.exists
+
 - name: Install Starship completions
   ansible.builtin.shell: "starship completions zsh > {{ ansible_env.HOME }}/.oh-my-zsh/custom/starship.zsh"
   args:
     creates: "{{ ansible_env.HOME }}/.oh-my-zsh/custom/starship.zsh"
   become: false
-  when: ohmyzsh_custom_dir.stat.exists
+  when:
+    - ohmyzsh_custom_dir.stat.exists
+    - starship_cli_check.rc == 0

@@ -59,6 +59,18 @@
   when: ansible_facts.os_family == "Debian"
 
 # PowerShell ###################################################################
+- name: Check current PowerShell version
+  ansible.builtin.command: pwsh --version
+  register: powershell_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report PowerShell version
+  ansible.builtin.debug:
+    msg: "PowerShell version: {{ (powershell_version_check.rc == 0) | ternary((powershell_version_check.stdout | default('') | trim), 'not installed') }}"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Fetch latest PowerShell release metadata
   ansible.builtin.uri:
     url: https://api.github.com/repos/PowerShell/PowerShell/releases/latest
@@ -123,6 +135,11 @@
   register: kitty_version_check
   changed_when: false
   failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report kitty version
+  ansible.builtin.debug:
+    msg: "Kitty version: {{ (kitty_version_check.rc == 0) | ternary((kitty_version_check.stdout | default('') | trim), 'not installed') }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest kitty release metadata
@@ -239,6 +256,11 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
+- name: Report btop version
+  ansible.builtin.debug:
+    msg: "Btop version: {{ (btop_version_check.rc == 0) | ternary((btop_version_check.stdout | default('') | trim), 'not installed') }}"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Fetch latest btop release metadata
   ansible.builtin.uri:
     url: https://api.github.com/repos/aristocratos/btop/releases/latest
@@ -331,6 +353,11 @@
   register: lsd_version_check
   changed_when: false
   failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report lsd version
+  ansible.builtin.debug:
+    msg: "Lsd version: {{ (lsd_version_check.rc == 0) | ternary((lsd_version_check.stdout | default('') | trim), 'not installed') }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest lsd release metadata
@@ -430,6 +457,11 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
+- name: Report fzf version
+  ansible.builtin.debug:
+    msg: "Fzf version: {{ (fzf_version_check.rc == 0) | ternary((fzf_version_check.stdout | default('') | trim), 'not installed') }}"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Fetch latest fzf release metadata
   ansible.builtin.uri:
     url: https://api.github.com/repos/junegunn/fzf/releases/latest
@@ -525,6 +557,11 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
+- name: Report starship version
+  ansible.builtin.debug:
+    msg: "Starship version: {{ (starship_version_check.rc == 0) | ternary((starship_version_check.stdout | default('') | trim), 'not installed') }}"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Fetch latest starship release metadata
   ansible.builtin.uri:
     url: https://api.github.com/repos/starship/starship/releases/latest
@@ -618,6 +655,11 @@
   register: yazi_version_check
   changed_when: false
   failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report yazi version
+  ansible.builtin.debug:
+    msg: "Yazi version: {{ (yazi_version_check.rc == 0) | ternary((yazi_version_check.stdout | default('') | trim), 'not installed') }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest yazi release metadata
@@ -737,6 +779,11 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
+- name: Report mosh version
+  ansible.builtin.debug:
+    msg: "Mosh version: {{ (mosh_version_check.rc == 0) | ternary((mosh_version_check.stdout | default('') | trim), 'not installed') }}"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Fetch latest mosh release metadata
   ansible.builtin.uri:
     url: https://api.github.com/repos/mobile-shell/mosh/releases/latest
@@ -847,6 +894,11 @@
   register: ytdlp_version_check
   changed_when: false
   failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report yt-dlp version
+  ansible.builtin.debug:
+    msg: "yt-dlp version: {{ (ytdlp_version_check.rc == 0) | ternary((ytdlp_version_check.stdout | default('') | trim), 'not installed') }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest yt-dlp release metadata
