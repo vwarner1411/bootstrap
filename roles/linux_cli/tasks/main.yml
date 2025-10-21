@@ -540,8 +540,11 @@
 
 - name: Set starship release facts
   ansible.builtin.set_fact:
-    starship_target_version_raw: "{{ starship_release.json.tag_name | default('') }}"
-    starship_target_version: "{{ starship_target_version_raw | regex_replace('^v', '') }}"
+    starship_target_version: "{{ (starship_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set starship asset URL
+  ansible.builtin.set_fact:
     starship_asset: >-
       {{
         (starship_release.json.assets | default([]))
@@ -551,19 +554,16 @@
         | first
         | default('', true)
       }}
-    starship_present: "{{ (starship_version_check.rc | default(1)) == 0 }}"
-    starship_present_version: >-
-      {{
-        (starship_version_check.stdout | default(''))
-        | regex_search('([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    starship_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if starship install is required
+  ansible.builtin.set_fact:
+    starship_install_required: >-
       {{
         (starship_asset | length > 0) and
         (
-          (not starship_present) or
-          (starship_present_version != starship_target_version)
+          (starship_version_check.rc | default(1)) != 0 or
+          (starship_version_check.stdout is defined and starship_target_version not in starship_version_check.stdout)
         )
       }}
   when: ansible_facts.os_family == "Debian"
@@ -575,7 +575,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - starship_needs_install
+    - starship_install_required
 
 - name: Unpack starship release
   ansible.builtin.unarchive:
@@ -584,7 +584,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - starship_needs_install
+    - starship_install_required
 
 - name: Install starship binary
   ansible.builtin.copy:
@@ -594,7 +594,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - starship_needs_install
+    - starship_install_required
 
 - name: Remove starship build artifacts
   ansible.builtin.file:
@@ -602,7 +602,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - starship_needs_install
+    - starship_install_required
 
 - name: Clean starship archive
   ansible.builtin.file:
@@ -610,7 +610,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - starship_needs_install
+    - starship_install_required
 
 # yazi #########################################################################
 - name: Check current yazi version
@@ -635,8 +635,11 @@
 
 - name: Set yazi release facts
   ansible.builtin.set_fact:
-    yazi_target_version_raw: "{{ yazi_release.json.tag_name | default('') }}"
-    yazi_target_version: "{{ yazi_target_version_raw | regex_replace('^v', '') }}"
+    yazi_target_version: "{{ (yazi_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set yazi asset URL
+  ansible.builtin.set_fact:
     yazi_asset: >-
       {{
         (yazi_release.json.assets | default([]))
@@ -646,19 +649,16 @@
         | first
         | default('', true)
       }}
-    yazi_present: "{{ (yazi_version_check.rc | default(1)) == 0 }}"
-    yazi_present_version: >-
-      {{
-        (yazi_version_check.stdout | default(''))
-        | regex_search('([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    yazi_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if yazi install is required
+  ansible.builtin.set_fact:
+    yazi_install_required: >-
       {{
         (yazi_asset | length > 0) and
         (
-          (not yazi_present) or
-          (yazi_present_version != yazi_target_version)
+          (yazi_version_check.rc | default(1)) != 0 or
+          (yazi_version_check.stdout is defined and yazi_target_version not in yazi_version_check.stdout)
         )
       }}
   when: ansible_facts.os_family == "Debian"
@@ -670,7 +670,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - yazi_needs_install
+    - yazi_install_required
 
 - name: Ensure yazi version directory exists
   ansible.builtin.file:
@@ -679,7 +679,7 @@
     mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
-    - yazi_needs_install
+    - yazi_install_required
 
 - name: Extract yazi release
   ansible.builtin.unarchive:
@@ -690,7 +690,7 @@
       - "--strip-components=1"
   when:
     - ansible_facts.os_family == "Debian"
-    - yazi_needs_install
+    - yazi_install_required
 
 - name: Update yazi current symlink
   ansible.builtin.file:
@@ -700,7 +700,7 @@
     force: true
   when:
     - ansible_facts.os_family == "Debian"
-    - yazi_needs_install
+    - yazi_install_required
 
 - name: Ensure yazi binary permissions
   ansible.builtin.file:
@@ -709,7 +709,7 @@
     mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
-    - yazi_needs_install
+    - yazi_install_required
 
 - name: Ensure yazi symlink exists
   ansible.builtin.file:
@@ -719,7 +719,7 @@
     force: true
   when:
     - ansible_facts.os_family == "Debian"
-    - (yazi_needs_install or yazi_present)
+    - (yazi_install_required or (yazi_version_check.rc | default(1)) == 0)
 
 - name: Clean yazi archive
   ansible.builtin.file:
@@ -727,7 +727,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - yazi_needs_install
+    - yazi_install_required
 
 # mosh #########################################################################
 - name: Check current mosh version
@@ -752,8 +752,11 @@
 
 - name: Set mosh release facts
   ansible.builtin.set_fact:
-    mosh_target_version_raw: "{{ mosh_release.json.tag_name | default('') }}"
-    mosh_target_version: "{{ mosh_target_version_raw | regex_replace('^v', '') }}"
+    mosh_target_version: "{{ (mosh_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set mosh asset URL
+  ansible.builtin.set_fact:
     mosh_asset: >-
       {{
         (mosh_release.json.assets | default([]))
@@ -763,19 +766,16 @@
         | first
         | default('', true)
       }}
-    mosh_present: "{{ (mosh_version_check.rc | default(1)) == 0 }}"
-    mosh_present_version: >-
-      {{
-        (mosh_version_check.stdout | default(''))
-        | regex_search('([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    mosh_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if mosh install is required
+  ansible.builtin.set_fact:
+    mosh_install_required: >-
       {{
         (mosh_asset | length > 0) and
         (
-          (not mosh_present) or
-          (mosh_present_version != mosh_target_version)
+          (mosh_version_check.rc | default(1)) != 0 or
+          (mosh_version_check.stdout is defined and mosh_target_version not in mosh_version_check.stdout)
         )
       }}
   when: ansible_facts.os_family == "Debian"
@@ -787,7 +787,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
+    - mosh_install_required
 
 - name: Unpack mosh release
   ansible.builtin.unarchive:
@@ -796,7 +796,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
+    - mosh_install_required
 
 - name: Configure mosh
   ansible.builtin.command:
@@ -805,7 +805,7 @@
     creates: "{{ linux_cli_download_dir }}/mosh-{{ mosh_target_version }}/config.status"
   when:
     - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
+    - mosh_install_required
 
 - name: Build mosh
   ansible.builtin.command:
@@ -814,7 +814,7 @@
     creates: "{{ linux_cli_download_dir }}/mosh-{{ mosh_target_version }}/src/frontend/mosh"
   when:
     - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
+    - mosh_install_required
 
 - name: Install mosh
   ansible.builtin.command:
@@ -823,7 +823,7 @@
   changed_when: true
   when:
     - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
+    - mosh_install_required
 
 - name: Remove mosh build directory
   ansible.builtin.file:
@@ -831,7 +831,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
+    - mosh_install_required
 
 - name: Clean mosh archive
   ansible.builtin.file:
@@ -839,7 +839,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - mosh_needs_install
+    - mosh_install_required
 
 # yt-dlp #######################################################################
 - name: Check current yt-dlp version
@@ -864,8 +864,11 @@
 
 - name: Set yt-dlp release facts
   ansible.builtin.set_fact:
-    ytdlp_target_version_raw: "{{ ytdlp_release.json.tag_name | default('') }}"
-    ytdlp_target_version: "{{ ytdlp_target_version_raw | regex_replace('^v', '') }}"
+    ytdlp_target_version: "{{ (ytdlp_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set yt-dlp asset URL
+  ansible.builtin.set_fact:
     ytdlp_asset: >-
       {{
         (ytdlp_release.json.assets | default([]))
@@ -875,14 +878,16 @@
         | first
         | default('', true)
       }}
-    ytdlp_present: "{{ (ytdlp_version_check.rc | default(1)) == 0 }}"
-    ytdlp_present_version: "{{ ytdlp_version_check.stdout | default('') }}"
-    ytdlp_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if yt-dlp install is required
+  ansible.builtin.set_fact:
+    ytdlp_install_required: >-
       {{
         (ytdlp_asset | length > 0) and
         (
-          (not ytdlp_present) or
-          (ytdlp_target_version not in ytdlp_present_version)
+          (ytdlp_version_check.rc | default(1)) != 0 or
+          (ytdlp_version_check.stdout is defined and ytdlp_target_version not in ytdlp_version_check.stdout)
         )
       }}
   when: ansible_facts.os_family == "Debian"
@@ -894,4 +899,4 @@
     mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
-    - ytdlp_needs_install
+    - ytdlp_install_required
