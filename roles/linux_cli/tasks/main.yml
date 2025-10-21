@@ -422,7 +422,7 @@
 - name: Unpack btop release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/btop.tbz"
-    dest: "{{ linux_cli_download_dir }}"
+    dest: "{{ linux_cli_download_dir }}/yazi"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
@@ -518,7 +518,7 @@
 - name: Set lsd asset URL
   ansible.builtin.set_fact:
     lsd_triple: "{{ arch_cpu ~ '-unknown-linux-gnu' }}"
-    lsd_asset_name: "lsd-{{ lsd_target_version }}-{{ lsd_triple }}.tar.gz"
+    lsd_asset_name: "lsd-v{{ lsd_target_version }}-{{ arch_cpu }}-unknown-linux-gnu.tar.gz"
     lsd_asset: >-
       {{
         (lsd_release.json.assets | default([]))
@@ -568,7 +568,7 @@
 - name: Unpack lsd release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/lsd.tar.gz"
-    dest: "{{ linux_cli_download_dir }}"
+    dest: "{{ linux_cli_download_dir }}/yazi"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
@@ -712,7 +712,7 @@
 - name: Unpack fzf release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/fzf.tar.gz"
-    dest: "{{ linux_cli_download_dir }}"
+    dest: "{{ linux_cli_download_dir }}/yazi"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
@@ -856,7 +856,7 @@
 - name: Unpack starship release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/starship.tar.gz"
-    dest: "{{ linux_cli_download_dir }}"
+    dest: "{{ linux_cli_download_dir }}/yazi"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
@@ -950,7 +950,7 @@
 
 - name: Set yazi asset URL
   ansible.builtin.set_fact:
-    yazi_asset_name: "yazi-{{ arch_cpu }}-unknown-linux-gnu.tar.xz"
+    yazi_asset_name: "yazi-{{ arch_cpu }}-unknown-linux-gnu.zip"
     yazi_asset: >-
       {{
         (yazi_release.json.assets | default([]))
@@ -960,6 +960,12 @@
         | first
         | default('', true)
       }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure unzip is available
+  ansible.builtin.package:
+    name: unzip
+    state: present
   when: ansible_facts.os_family == "Debian"
 - name: Debug yazi asset selection
   ansible.builtin.debug:
@@ -1008,11 +1014,10 @@
 
 - name: Extract yazi release
   ansible.builtin.unarchive:
-    src: "{{ linux_cli_download_dir }}/yazi.tar.xz"
-    dest: "/opt/yazi-{{ yazi_target_version }}"
+    src: "{{ linux_cli_download_dir }}/yazi.zip"
+    dest: "{{ linux_cli_download_dir }}/yazi"
     remote_src: true
-    extra_opts:
-      - "--strip-components=1"
+    creates: "{{ linux_cli_download_dir }}/yazi/yazi"
   when:
     - ansible_facts.os_family == "Debian"
     - yazi_install_required
@@ -1166,7 +1171,7 @@
 - name: Unpack mosh release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/mosh.tar.gz"
-    dest: "{{ linux_cli_download_dir }}"
+    dest: "{{ linux_cli_download_dir }}/yazi"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
