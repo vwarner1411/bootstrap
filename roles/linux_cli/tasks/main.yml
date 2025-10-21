@@ -348,8 +348,12 @@
 
 - name: Set lsd release facts
   ansible.builtin.set_fact:
-    lsd_target_version_raw: "{{ lsd_release.json.tag_name | default('') }}"
-    lsd_target_version: "{{ lsd_target_version_raw | regex_replace('^v', '') }}"
+    lsd_target_version: "{{ (lsd_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+    lsd_triple: "{{ arch_cpu ~ '-unknown-linux-gnu' }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set lsd asset URL
+  ansible.builtin.set_fact:
     lsd_triple: "{{ arch_cpu ~ '-unknown-linux-gnu' }}"
     lsd_asset: >-
       {{
@@ -360,19 +364,16 @@
         | first
         | default('', true)
       }}
-    lsd_present: "{{ (lsd_version_check.rc | default(1)) == 0 }}"
-    lsd_present_version: >-
-      {{
-        (lsd_version_check.stdout | default(''))
-        | regex_search('([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    lsd_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if lsd install is required
+  ansible.builtin.set_fact:
+    lsd_install_required: >-
       {{
         (lsd_asset | length > 0) and
         (
-          (not lsd_present) or
-          (lsd_present_version != lsd_target_version)
+          (lsd_version_check.rc | default(1)) != 0 or
+          (lsd_version_check.stdout is defined and lsd_target_version not in lsd_version_check.stdout)
         )
       }}
   when: ansible_facts.os_family == "Debian"
@@ -384,7 +385,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
+    - lsd_install_required
 
 - name: Unpack lsd release
   ansible.builtin.unarchive:
@@ -393,7 +394,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
+    - lsd_install_required
 
 - name: Install lsd binary
   ansible.builtin.copy:
@@ -403,7 +404,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
+    - lsd_install_required
 
 - name: Remove lsd build directory
   ansible.builtin.file:
@@ -411,7 +412,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
+    - lsd_install_required
 
 - name: Clean lsd archive
   ansible.builtin.file:
@@ -419,7 +420,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - lsd_needs_install
+    - lsd_install_required
 
 # fzf ##########################################################################
 - name: Check current fzf version
