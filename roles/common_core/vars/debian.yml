@@ -5,7 +5,6 @@ common_core_debian_packages:
   - curl
   - git
   - gnupg
-  - jq
   - lynx
   - ncdu
   - neovim

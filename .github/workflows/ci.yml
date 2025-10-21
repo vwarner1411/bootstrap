@@ -58,6 +58,7 @@ jobs:
               export HOME=/root
               cd /workspace
               ./scripts/bootstrap.sh
+              export PATH="/root/.local/bin:$PATH"
               starship --version
               yazi --version
               ansible-playbook --version

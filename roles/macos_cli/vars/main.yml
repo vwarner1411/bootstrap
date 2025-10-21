@@ -18,7 +18,6 @@ macos_cli_brew_packages:
   - yazi
   - fzf
   - yt-dlp
-  - mosh
   - ansible
   - powershell
 

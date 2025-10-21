@@ -29,7 +29,7 @@ Re-run the same command any time to upgrade packages and reapply dotfiles.
 | Core CLI            | git, curl, wget, rsync, jq, ncdu, tree, lynx  | Same set using `apt`, plus python3/pip, build-essential, sysstat  |
 | Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autocomplete, syntax-highlighting) |
 | Prompt/UX           | starship, lsd, yazi, fzf, btop, kitty         | Latest GitHub releases for starship, lsd, yazi, fzf, btop, kitty  |
-| Development         | neovim, mosh, ansible, Powershell, yt-dlp     | Latest GitHub releases for Ansible CLI, mosh, PowerShell, yt-dlp  |
+| Development         | neovim, ansible, Powershell, yt-dlp           | Latest GitHub releases for Ansible CLI, PowerShell, yt-dlp        |
 | Dotfiles            | Managed via `chezmoi init --apply`            | Same dotfiles source                                              |
 
 Linux nodes never rely on Homebrew; developer tooling comes straight from GitHub releases (apt is only used for core OS/build dependencies).

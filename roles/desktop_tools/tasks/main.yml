@@ -1,6 +1,7 @@
 - name: Install desktop packages on Debian
   ansible.builtin.apt:
     name:
+      - jq
       - fonts-firacode
     state: present
   when: ansible_facts.os_family == "Debian"

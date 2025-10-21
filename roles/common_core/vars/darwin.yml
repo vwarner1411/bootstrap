@@ -19,7 +19,6 @@ common_core_brew_packages:
   - yazi
   - fzf
   - yt-dlp
-  - mosh
   - powershell
   - zip
   - pipx
