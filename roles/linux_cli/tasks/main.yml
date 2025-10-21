@@ -252,6 +252,13 @@
     - ansible_facts.os_family == "Debian"
     - kitty_install_required
 
+- name: Create kitty installation directory
+  ansible.builtin.file:
+    path: "/opt/kitty-{{ kitty_target_version }}"
+    state: directory
+    mode: "0755"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Extract kitty release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/kitty.txz"
