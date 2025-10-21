@@ -140,8 +140,11 @@
 
 - name: Set kitty release facts
   ansible.builtin.set_fact:
-    kitty_target_version_raw: "{{ kitty_release.json.tag_name | default('') }}"
-    kitty_target_version: "{{ kitty_target_version_raw | regex_replace('^v', '') }}"
+    kitty_target_version: "{{ (kitty_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set kitty asset URL
+  ansible.builtin.set_fact:
     kitty_asset: >-
       {{
         (kitty_release.json.assets | default([]))
@@ -151,20 +154,14 @@
         | first
         | default('', true)
       }}
-    kitty_present: "{{ (kitty_version_check.rc | default(1)) == 0 }}"
-    kitty_present_version: >-
-      {{
-        (kitty_version_check.stdout | default(''))
-        | regex_search('([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    kitty_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if kitty install is required
+  ansible.builtin.set_fact:
+    kitty_install_required: >-
       {{
         (kitty_asset | length > 0) and
-        (
-          (not kitty_present) or
-          (kitty_present_version != kitty_target_version)
-        )
+        (kitty_version_check.stdout is not defined or kitty_target_version not in kitty_version_check.stdout)
       }}
   when: ansible_facts.os_family == "Debian"
 
@@ -175,7 +172,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
+    - kitty_install_required
 
 - name: Ensure kitty version directory exists
   ansible.builtin.file:
@@ -184,7 +181,7 @@
     mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
+    - kitty_install_required
 
 - name: Extract kitty release
   ansible.builtin.unarchive:
@@ -195,7 +192,7 @@
       - "--strip-components=1"
   when:
     - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
+    - kitty_install_required
 
 - name: Ensure kitty binary permissions
   ansible.builtin.file:
@@ -204,7 +201,7 @@
     mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
+    - kitty_install_required
 
 - name: Update kitty current symlink
   ansible.builtin.file:
@@ -214,7 +211,7 @@
     force: true
   when:
     - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
+    - kitty_install_required
 
 - name: Ensure kitty symlink exists
   ansible.builtin.file:
@@ -224,7 +221,7 @@
     force: true
   when:
     - ansible_facts.os_family == "Debian"
-    - (kitty_needs_install or kitty_present)
+    - (kitty_version_check.rc | default(1)) == 0 or kitty_install_required
 
 - name: Clean kitty archive
   ansible.builtin.file:
@@ -232,7 +229,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - kitty_needs_install
+    - kitty_install_required
 
 # btop #########################################################################
 - name: Check current btop version
