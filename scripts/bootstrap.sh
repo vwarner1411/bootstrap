@@ -193,7 +193,20 @@ install_collections() {
 
 run_playbook() {
   pushd "$WORKDIR" >/dev/null
-  local cmd=(ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=${PROFILE}")
+  local target_user target_home extra_vars
+  target_user="${SUDO_USER:-$USER}"
+  target_home="$(python3 - "$target_user" <<'PY'
+import os, pwd, sys
+user = sys.argv[1]
+try:
+    print(pwd.getpwnam(user).pw_dir)
+except KeyError:
+    print(os.environ.get("HOME", ""))
+PY
+)"
+  target_home="${target_home:-$HOME}"
+  extra_vars="profile=${PROFILE} shell_user=${target_user} shell_home=${target_home}"
+  local cmd=(ansible-playbook playbooks/bootstrap.yml --extra-vars "$extra_vars")
   if [ "$EUID" -ne 0 ] && [ -t 0 ]; then
     cmd+=(--ask-become-pass)
   fi

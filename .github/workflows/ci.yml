@@ -38,16 +38,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run bootstrap script inside container
-        env:
-          BOOTSTRAP_PROFILE: desktop
+      - name: Run bootstrap script inside container (desktop)
         run: |
           docker run --rm \
             -v "$PWD":/workspace \
             -e REPO_URL="file:///workspace" \
             -e CHEZMOI_REPO="/workspace/tests/fixtures/chezmoi" \
             -e WORKDIR="/root/.local/share/zshell" \
-            -e PROFILE="$BOOTSTRAP_PROFILE" \
+            -e PROFILE="desktop" \
             ubuntu:24.04 \
             bash -lc '
               set -euo pipefail
@@ -62,4 +60,26 @@ jobs:
               starship --version
               yazi --version
               ansible-playbook --version
+            '
+
+      - name: Run bootstrap script inside container (server)
+        run: |
+          docker run --rm \
+            -v "$PWD":/workspace \
+            -e REPO_URL="file:///workspace" \
+            -e CHEZMOI_REPO="/workspace/tests/fixtures/chezmoi" \
+            -e WORKDIR="/root/.local/share/zshell" \
+            -e PROFILE="server" \
+            ubuntu:24.04 \
+            bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y sudo curl git python3 python3-pip python3-venv ca-certificates
+              mkdir -p /root
+              export HOME=/root
+              cd /workspace
+              ./scripts/bootstrap.sh
+              export PATH="/root/.local/bin:$PATH"
+              ls -1 /usr/local/bin
             '
