@@ -66,9 +66,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report PowerShell version
+- name: Compute existing PowerShell version string
+  ansible.builtin.set_fact:
+    powershell_version_pretty: >-
+      {{ (powershell_version_check.rc == 0) | ternary((powershell_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing PowerShell version
   ansible.builtin.debug:
-    msg: "PowerShell version: {{ (powershell_version_check.rc == 0) | ternary((powershell_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "PowerShell version (pre-install): {{ powershell_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest PowerShell release metadata
@@ -129,6 +135,24 @@
     force: true
   when: ansible_facts.os_family == "Debian"
 
+- name: Capture PowerShell version after install
+  ansible.builtin.command: pwsh --version
+  register: powershell_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed PowerShell version string
+  ansible.builtin.set_fact:
+    powershell_version_post_pretty: >-
+      {{ (powershell_version_post.rc == 0) | ternary((powershell_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed PowerShell version
+  ansible.builtin.debug:
+    msg: "PowerShell version after install: {{ powershell_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # kitty ########################################################################
 - name: Check current kitty version
   ansible.builtin.command: kitty --version
@@ -137,9 +161,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report kitty version
+- name: Compute existing kitty version string
+  ansible.builtin.set_fact:
+    kitty_version_pretty: >-
+      {{ (kitty_version_check.rc == 0) | ternary((kitty_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing kitty version
   ansible.builtin.debug:
-    msg: "Kitty version: {{ (kitty_version_check.rc == 0) | ternary((kitty_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "Kitty version (pre-install): {{ kitty_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest kitty release metadata
@@ -178,7 +208,10 @@
     kitty_install_required: >-
       {{
         (kitty_asset | length > 0) and
-        (kitty_version_check.stdout is not defined or kitty_target_version not in kitty_version_check.stdout)
+        (
+          (kitty_version_check.rc | default(1)) != 0 or
+          (kitty_version_check.stdout is defined and kitty_target_version not in kitty_version_check.stdout)
+        )
       }}
   when: ansible_facts.os_family == "Debian"
 
@@ -248,6 +281,24 @@
     - ansible_facts.os_family == "Debian"
     - kitty_install_required
 
+- name: Capture kitty version after install
+  ansible.builtin.command: kitty --version
+  register: kitty_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed kitty version string
+  ansible.builtin.set_fact:
+    kitty_version_post_pretty: >-
+      {{ (kitty_version_post.rc == 0) | ternary((kitty_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed kitty version
+  ansible.builtin.debug:
+    msg: "Kitty version after install: {{ kitty_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # btop #########################################################################
 - name: Check current btop version
   ansible.builtin.command: btop --version
@@ -256,9 +307,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report btop version
+- name: Compute existing btop version string
+  ansible.builtin.set_fact:
+    btop_version_pretty: >-
+      {{ (btop_version_check.rc == 0) | ternary((btop_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing btop version
   ansible.builtin.debug:
-    msg: "Btop version: {{ (btop_version_check.rc == 0) | ternary((btop_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "Btop version (pre-install): {{ btop_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest btop release metadata
@@ -347,6 +404,24 @@
     - ansible_facts.os_family == "Debian"
     - btop_install_required
 
+- name: Capture btop version after install
+  ansible.builtin.command: btop --version
+  register: btop_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed btop version string
+  ansible.builtin.set_fact:
+    btop_version_post_pretty: >-
+      {{ (btop_version_post.rc == 0) | ternary((btop_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed btop version
+  ansible.builtin.debug:
+    msg: "Btop version after install: {{ btop_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # lsd ##########################################################################
 - name: Check current lsd version
   ansible.builtin.command: lsd --version
@@ -355,9 +430,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report lsd version
+- name: Compute existing lsd version string
+  ansible.builtin.set_fact:
+    lsd_version_pretty: >-
+      {{ (lsd_version_check.rc == 0) | ternary((lsd_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing lsd version
   ansible.builtin.debug:
-    msg: "Lsd version: {{ (lsd_version_check.rc == 0) | ternary((lsd_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "Lsd version (pre-install): {{ lsd_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest lsd release metadata
@@ -449,6 +530,24 @@
     - ansible_facts.os_family == "Debian"
     - lsd_install_required
 
+- name: Capture lsd version after install
+  ansible.builtin.command: lsd --version
+  register: lsd_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed lsd version string
+  ansible.builtin.set_fact:
+    lsd_version_post_pretty: >-
+      {{ (lsd_version_post.rc == 0) | ternary((lsd_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed lsd version
+  ansible.builtin.debug:
+    msg: "Lsd version after install: {{ lsd_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # fzf ##########################################################################
 - name: Check current fzf version
   ansible.builtin.command: fzf --version
@@ -457,9 +556,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report fzf version
+- name: Compute existing fzf version string
+  ansible.builtin.set_fact:
+    fzf_version_pretty: >-
+      {{ (fzf_version_check.rc == 0) | ternary((fzf_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing fzf version
   ansible.builtin.debug:
-    msg: "Fzf version: {{ (fzf_version_check.rc == 0) | ternary((fzf_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "Fzf version (pre-install): {{ fzf_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest fzf release metadata
@@ -549,6 +654,24 @@
     - ansible_facts.os_family == "Debian"
     - fzf_install_required
 
+- name: Capture fzf version after install
+  ansible.builtin.command: fzf --version
+  register: fzf_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed fzf version string
+  ansible.builtin.set_fact:
+    fzf_version_post_pretty: >-
+      {{ (fzf_version_post.rc == 0) | ternary((fzf_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed fzf version
+  ansible.builtin.debug:
+    msg: "Fzf version after install: {{ fzf_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # starship #####################################################################
 - name: Check current starship version
   ansible.builtin.command: starship --version
@@ -557,9 +680,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report starship version
+- name: Compute existing starship version string
+  ansible.builtin.set_fact:
+    starship_version_pretty: >-
+      {{ (starship_version_check.rc == 0) | ternary((starship_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing starship version
   ansible.builtin.debug:
-    msg: "Starship version: {{ (starship_version_check.rc == 0) | ternary((starship_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "Starship version (pre-install): {{ starship_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest starship release metadata
@@ -649,6 +778,24 @@
     - ansible_facts.os_family == "Debian"
     - starship_install_required
 
+- name: Capture starship version after install
+  ansible.builtin.command: starship --version
+  register: starship_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed starship version string
+  ansible.builtin.set_fact:
+    starship_version_post_pretty: >-
+      {{ (starship_version_post.rc == 0) | ternary((starship_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed starship version
+  ansible.builtin.debug:
+    msg: "Starship version after install: {{ starship_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # yazi #########################################################################
 - name: Check current yazi version
   ansible.builtin.command: yazi --version
@@ -657,9 +804,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report yazi version
+- name: Compute existing yazi version string
+  ansible.builtin.set_fact:
+    yazi_version_pretty: >-
+      {{ (yazi_version_check.rc == 0) | ternary((yazi_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing yazi version
   ansible.builtin.debug:
-    msg: "Yazi version: {{ (yazi_version_check.rc == 0) | ternary((yazi_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "Yazi version (pre-install): {{ yazi_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest yazi release metadata
@@ -771,6 +924,24 @@
     - ansible_facts.os_family == "Debian"
     - yazi_install_required
 
+- name: Capture yazi version after install
+  ansible.builtin.command: yazi --version
+  register: yazi_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed yazi version string
+  ansible.builtin.set_fact:
+    yazi_version_post_pretty: >-
+      {{ (yazi_version_post.rc == 0) | ternary((yazi_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed yazi version
+  ansible.builtin.debug:
+    msg: "Yazi version after install: {{ yazi_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # mosh #########################################################################
 - name: Check current mosh version
   ansible.builtin.command: mosh --version
@@ -779,9 +950,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report mosh version
+- name: Compute existing mosh version string
+  ansible.builtin.set_fact:
+    mosh_version_pretty: >-
+      {{ (mosh_version_check.rc == 0) | ternary((mosh_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing mosh version
   ansible.builtin.debug:
-    msg: "Mosh version: {{ (mosh_version_check.rc == 0) | ternary((mosh_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "Mosh version (pre-install): {{ mosh_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest mosh release metadata
@@ -888,6 +1065,24 @@
     - ansible_facts.os_family == "Debian"
     - mosh_install_required
 
+- name: Capture mosh version after install
+  ansible.builtin.command: mosh --version
+  register: mosh_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed mosh version string
+  ansible.builtin.set_fact:
+    mosh_version_post_pretty: >-
+      {{ (mosh_version_post.rc == 0) | ternary((mosh_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed mosh version
+  ansible.builtin.debug:
+    msg: "Mosh version after install: {{ mosh_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # yt-dlp #######################################################################
 - name: Check current yt-dlp version
   ansible.builtin.command: yt-dlp --version
@@ -896,9 +1091,15 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
-- name: Report yt-dlp version
+- name: Compute existing yt-dlp version string
+  ansible.builtin.set_fact:
+    ytdlp_version_pretty: >-
+      {{ (ytdlp_version_check.rc == 0) | ternary((ytdlp_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report existing yt-dlp version
   ansible.builtin.debug:
-    msg: "yt-dlp version: {{ (ytdlp_version_check.rc == 0) | ternary((ytdlp_version_check.stdout | default('') | trim), 'not installed') }}"
+    msg: "yt-dlp version (pre-install): {{ ytdlp_version_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Fetch latest yt-dlp release metadata
@@ -952,3 +1153,21 @@
   when:
     - ansible_facts.os_family == "Debian"
     - ytdlp_install_required
+
+- name: Capture yt-dlp version after install
+  ansible.builtin.command: yt-dlp --version
+  register: ytdlp_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed yt-dlp version string
+  ansible.builtin.set_fact:
+    ytdlp_version_post_pretty: >-
+      {{ (ytdlp_version_post.rc == 0) | ternary((ytdlp_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed yt-dlp version
+  ansible.builtin.debug:
+    msg: "yt-dlp version after install: {{ ytdlp_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
