@@ -25,7 +25,7 @@
 
 - name: Check for oh-my-zsh custom directory
   ansible.builtin.stat:
-    path: "{{ ansible_env.HOME }}/.oh-my-zsh/custom"
+    path: "{{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom"
   register: ohmyzsh_custom_dir
   become: false
 
@@ -38,9 +38,9 @@
   when: ohmyzsh_custom_dir.stat.exists
 
 - name: Install Starship completions
-  ansible.builtin.shell: "starship completions zsh > {{ ansible_env.HOME }}/.oh-my-zsh/custom/starship.zsh"
+  ansible.builtin.shell: "starship completions zsh > {{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom/starship.zsh"
   args:
-    creates: "{{ ansible_env.HOME }}/.oh-my-zsh/custom/starship.zsh"
+    creates: "{{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom/starship.zsh"
   become: false
   when:
     - ohmyzsh_custom_dir.stat.exists

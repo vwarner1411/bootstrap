@@ -14,7 +14,7 @@
     shell_extras_target_home: >-
       {{
         (
-          shell_home | default('') 
+          shell_home | default('')
           or getent_passwd.get(shell_extras_target_user, [''] * 6)[4]
           or ('/root' if shell_extras_target_user == 'root'
               else '/home/' ~ shell_extras_target_user)

@@ -3,6 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+echo "[tests] Installing required collections"
+mkdir -p "${ROOT_DIR}/collections"
+ansible-galaxy collection install -r "${ROOT_DIR}/requirements.yml" --force -p "${ROOT_DIR}/collections" >/dev/null
+
 echo "[tests] Running ansible-playbook syntax check"
 ansible-playbook --syntax-check "${ROOT_DIR}/playbooks/bootstrap.yml"
 
