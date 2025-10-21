@@ -102,7 +102,9 @@
 
 - name: Debug PowerShell asset selection
   ansible.builtin.debug:
-    msg: "PowerShell asset URL: {{ powershell_asset }}"
+    msg:
+      asset_names: "{{ powershell_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ powershell_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Download PowerShell release
@@ -209,7 +211,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug kitty asset selection
   ansible.builtin.debug:
-    msg: "Kitty asset URL: {{ kitty_asset }}"
+    msg:
+      asset_names: "{{ kitty_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ kitty_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if kitty install is required
@@ -308,6 +312,11 @@
     msg: "Kitty version after install: {{ kitty_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug kitty version command result
+  ansible.builtin.debug:
+    var: kitty_version_post
+  when: ansible_facts.os_family == "Debian"
+
 # btop #########################################################################
 - name: Check current btop version
   ansible.builtin.command: btop --version
@@ -359,7 +368,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug btop asset selection
   ansible.builtin.debug:
-    msg: "btop asset URL: {{ btop_asset }}"
+    msg:
+      asset_names: "{{ btop_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ btop_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if btop install is required
@@ -435,6 +446,11 @@
     msg: "Btop version after install: {{ btop_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug btop version command result
+  ansible.builtin.debug:
+    var: btop_version_post
+  when: ansible_facts.os_family == "Debian"
+
 # lsd ##########################################################################
 - name: Check current lsd version
   ansible.builtin.command: lsd --version
@@ -488,7 +504,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug lsd asset selection
   ansible.builtin.debug:
-    msg: "lsd asset URL: {{ lsd_asset }}"
+    msg:
+      asset_names: "{{ lsd_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ lsd_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if lsd install is required
@@ -565,6 +583,11 @@
     msg: "Lsd version after install: {{ lsd_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug lsd version command result
+  ansible.builtin.debug:
+    var: lsd_version_post
+  when: ansible_facts.os_family == "Debian"
+
 # fzf ##########################################################################
 - name: Check current fzf version
   ansible.builtin.command: fzf --version
@@ -616,7 +639,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug fzf asset selection
   ansible.builtin.debug:
-    msg: "fzf asset URL: {{ fzf_asset }}"
+    msg:
+      asset_names: "{{ fzf_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ fzf_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if fzf install is required
@@ -693,6 +718,11 @@
     msg: "Fzf version after install: {{ fzf_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug fzf version command result
+  ansible.builtin.debug:
+    var: fzf_version_post
+  when: ansible_facts.os_family == "Debian"
+
 # starship #####################################################################
 - name: Check current starship version
   ansible.builtin.command: starship --version
@@ -744,7 +774,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug starship asset selection
   ansible.builtin.debug:
-    msg: "Starship asset URL: {{ starship_asset }}"
+    msg:
+      asset_names: "{{ starship_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ starship_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if starship install is required
@@ -821,6 +853,11 @@
     msg: "Starship version after install: {{ starship_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug starship version command result
+  ansible.builtin.debug:
+    var: starship_version_post
+  when: ansible_facts.os_family == "Debian"
+
 # yazi #########################################################################
 - name: Check current yazi version
   ansible.builtin.command: yazi --version
@@ -872,7 +909,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug yazi asset selection
   ansible.builtin.debug:
-    msg: "Yazi asset URL: {{ yazi_asset }}"
+    msg:
+      asset_names: "{{ yazi_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ yazi_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if yazi install is required
@@ -971,6 +1010,11 @@
     msg: "Yazi version after install: {{ yazi_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug yazi version command result
+  ansible.builtin.debug:
+    var: yazi_version_post
+  when: ansible_facts.os_family == "Debian"
+
 # mosh #########################################################################
 - name: Check current mosh version
   ansible.builtin.command: mosh --version
@@ -1022,7 +1066,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug mosh asset selection
   ansible.builtin.debug:
-    msg: "Mosh asset URL: {{ mosh_asset }}"
+    msg:
+      asset_names: "{{ mosh_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ mosh_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if mosh install is required
@@ -1116,6 +1162,11 @@
     msg: "Mosh version after install: {{ mosh_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug mosh version command result
+  ansible.builtin.debug:
+    var: mosh_version_post
+  when: ansible_facts.os_family == "Debian"
+
 # yt-dlp #######################################################################
 - name: Check current yt-dlp version
   ansible.builtin.command: yt-dlp --version
@@ -1167,7 +1218,9 @@
   when: ansible_facts.os_family == "Debian"
 - name: Debug yt-dlp asset selection
   ansible.builtin.debug:
-    msg: "yt-dlp asset URL: {{ ytdlp_asset }}"
+    msg:
+      asset_names: "{{ ytdlp_release.json.assets | default([]) | map(attribute='name') | list }}"
+      asset_url: "{{ ytdlp_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if yt-dlp install is required
@@ -1207,4 +1260,9 @@
 - name: Report installed yt-dlp version
   ansible.builtin.debug:
     msg: "yt-dlp version after install: {{ ytdlp_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Debug yt-dlp version command result
+  ansible.builtin.debug:
+    var: ytdlp_version_post
   when: ansible_facts.os_family == "Debian"
