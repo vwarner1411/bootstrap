@@ -405,6 +405,14 @@
     - ansible_facts.os_family == "Debian"
     - btop_install_required
 
+- name: Remove previous btop build directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/btop"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_install_required
+
 - name: Unpack btop release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/btop.tbz"
@@ -537,6 +545,14 @@
     url: "{{ lsd_asset }}"
     dest: "{{ linux_cli_download_dir }}/lsd.tar.gz"
     mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_install_required
+
+- name: Remove previous lsd build directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/lsd-{{ lsd_target_version }}-{{ lsd_triple }}"
+    state: absent
   when:
     - ansible_facts.os_family == "Debian"
     - lsd_install_required
@@ -676,6 +692,14 @@
     - ansible_facts.os_family == "Debian"
     - fzf_install_required
 
+- name: Remove previous fzf build artifacts
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/fzf"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_install_required
+
 - name: Unpack fzf release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/fzf.tar.gz"
@@ -811,6 +835,14 @@
     - ansible_facts.os_family == "Debian"
     - starship_install_required
 
+- name: Remove previous starship build directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/starship"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - starship_install_required
+
 - name: Unpack starship release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/starship.tar.gz"
@@ -942,6 +974,14 @@
     url: "{{ yazi_asset }}"
     dest: "{{ linux_cli_download_dir }}/yazi.tar.xz"
     mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Remove existing yazi version directory
+  ansible.builtin.file:
+    path: "/opt/yazi-{{ yazi_target_version }}"
+    state: absent
   when:
     - ansible_facts.os_family == "Debian"
     - yazi_install_required
@@ -1099,6 +1139,14 @@
     url: "{{ mosh_asset }}"
     dest: "{{ linux_cli_download_dir }}/mosh.tar.gz"
     mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - mosh_install_required
+
+- name: Remove previous mosh build directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/mosh-{{ mosh_target_version }}"
+    state: absent
   when:
     - ansible_facts.os_family == "Debian"
     - mosh_install_required
