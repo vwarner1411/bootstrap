@@ -422,7 +422,7 @@
 - name: Unpack btop release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/btop.tbz"
-    dest: "{{ linux_cli_download_dir }}/yazi"
+    dest: "{{ linux_cli_download_dir }}"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
@@ -989,25 +989,16 @@
 - name: Download yazi release
   ansible.builtin.get_url:
     url: "{{ yazi_asset }}"
-    dest: "{{ linux_cli_download_dir }}/yazi.tar.xz"
+    dest: "{{ linux_cli_download_dir }}/yazi.zip"
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
     - yazi_install_required
 
-- name: Remove existing yazi version directory
+- name: Remove previous yazi extract directory
   ansible.builtin.file:
-    path: "/opt/yazi-{{ yazi_target_version }}"
+    path: "{{ linux_cli_download_dir }}/yazi_extract"
     state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - yazi_install_required
-
-- name: Ensure yazi version directory exists
-  ansible.builtin.file:
-    path: "/opt/yazi-{{ yazi_target_version }}"
-    state: directory
-    mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
     - yazi_install_required
@@ -1015,45 +1006,34 @@
 - name: Extract yazi release
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/yazi.zip"
-    dest: "{{ linux_cli_download_dir }}/yazi"
+    dest: "{{ linux_cli_download_dir }}/yazi_extract"
     remote_src: true
-    creates: "{{ linux_cli_download_dir }}/yazi/yazi"
+    creates: "{{ linux_cli_download_dir }}/yazi_extract/{{ yazi_asset_name | regex_replace('\\.zip$', '') }}/yazi"
   when:
     - ansible_facts.os_family == "Debian"
     - yazi_install_required
 
-- name: Update yazi current symlink
-  ansible.builtin.file:
-    src: "/opt/yazi-{{ yazi_target_version }}"
-    dest: /opt/yazi
-    state: link
-    force: true
-  when:
-    - ansible_facts.os_family == "Debian"
-    - yazi_install_required
-
-- name: Ensure yazi binary permissions
-  ansible.builtin.file:
-    path: /opt/yazi/bin/yazi
-    state: file
-    mode: "0755"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - yazi_install_required
-
-- name: Ensure yazi symlink exists
-  ansible.builtin.file:
-    src: /opt/yazi/bin/yazi
+- name: Install yazi binary
+  ansible.builtin.copy:
+    src: "{{ linux_cli_download_dir }}/yazi_extract/{{ yazi_asset_name | regex_replace('\\.zip$', '') }}/yazi"
     dest: /usr/local/bin/yazi
-    state: link
-    force: true
+    mode: "0755"
+    remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - (yazi_install_required or (yazi_version_check.rc | default(1)) == 0)
+    - yazi_install_required
 
 - name: Clean yazi archive
   ansible.builtin.file:
-    path: "{{ linux_cli_download_dir }}/yazi.tar.xz"
+    path: "{{ linux_cli_download_dir }}/yazi.zip"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Remove yazi extract directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/yazi_extract"
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
