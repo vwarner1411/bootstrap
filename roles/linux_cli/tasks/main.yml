@@ -254,8 +254,7 @@
 
 - name: Set btop release facts
   ansible.builtin.set_fact:
-    btop_target_version_raw: "{{ btop_release.json.tag_name | default('') }}"
-    btop_target_version: "{{ btop_target_version_raw | regex_replace('^v', '') }}"
+    btop_target_version: "{{ (btop_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Set btop asset URL
