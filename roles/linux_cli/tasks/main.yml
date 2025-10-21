@@ -244,6 +244,14 @@
     - ansible_facts.os_family == "Debian"
     - kitty_install_required
 
+- name: Remove existing kitty version directory
+  ansible.builtin.file:
+    path: "/opt/kitty-{{ kitty_target_version }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - kitty_install_required
+
 - name: Ensure kitty version directory exists
   ansible.builtin.file:
     path: "/opt/kitty-{{ kitty_target_version }}"
@@ -252,6 +260,8 @@
   when:
     - ansible_facts.os_family == "Debian"
     - kitty_install_required
+  # Remove any previous extraction leftovers before recreating directory
+
 
 - name: Extract kitty release
   ansible.builtin.unarchive:
