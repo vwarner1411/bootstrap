@@ -445,8 +445,11 @@
 
 - name: Set fzf release facts
   ansible.builtin.set_fact:
-    fzf_target_version_raw: "{{ fzf_release.json.tag_name | default('') }}"
-    fzf_target_version: "{{ fzf_target_version_raw | regex_replace('^v', '') }}"
+    fzf_target_version: "{{ (fzf_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set fzf asset URL
+  ansible.builtin.set_fact:
     fzf_asset: >-
       {{
         (fzf_release.json.assets | default([]))
@@ -456,19 +459,16 @@
         | first
         | default('', true)
       }}
-    fzf_present: "{{ (fzf_version_check.rc | default(1)) == 0 }}"
-    fzf_present_version: >-
-      {{
-        (fzf_version_check.stdout | default(''))
-        | regex_search('^([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    fzf_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if fzf install is required
+  ansible.builtin.set_fact:
+    fzf_install_required: >-
       {{
         (fzf_asset | length > 0) and
         (
-          (not fzf_present) or
-          (fzf_present_version != fzf_target_version)
+          (fzf_version_check.rc | default(1)) != 0 or
+          (fzf_version_check.stdout is defined and fzf_target_version not in fzf_version_check.stdout)
         )
       }}
   when: ansible_facts.os_family == "Debian"
@@ -480,7 +480,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
+    - fzf_install_required
 
 - name: Unpack fzf release
   ansible.builtin.unarchive:
@@ -489,7 +489,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
+    - fzf_install_required
 
 - name: Install fzf binary
   ansible.builtin.copy:
@@ -499,7 +499,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
+    - fzf_install_required
 
 - name: Remove fzf build artifacts
   ansible.builtin.file:
@@ -507,7 +507,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
+    - fzf_install_required
 
 - name: Clean fzf archive
   ansible.builtin.file:
@@ -515,7 +515,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - fzf_needs_install
+    - fzf_install_required
 
 # starship #####################################################################
 - name: Check current starship version
