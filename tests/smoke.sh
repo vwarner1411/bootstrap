@@ -12,7 +12,7 @@ ansible-playbook --syntax-check "${ROOT_DIR}/playbooks/bootstrap.yml"
 
 echo "[tests] Running ansible-lint (if available)"
 if command -v ansible-lint >/dev/null 2>&1; then
-  cli_version="$(ansible --version 2>/dev/null | awk 'NR==1 {gsub(/[^0-9.]/, \"\"); print $0}')"
+  cli_version="$(ansible --version 2>/dev/null | head -n1 | sed -E 's/.* ([0-9]+(\\.[0-9]+)*)$/\\1/')"
   py_version="$(python3 - <<'PY'
 import ansible
 print(getattr(ansible, '__version__', ''), end='')
@@ -26,7 +26,6 @@ PY
 else
   echo "[tests] ansible-lint not installed; skipping" >&2
 fi
-
 echo "[tests] Running shellcheck on scripts"
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck "${ROOT_DIR}/scripts/bootstrap.sh"

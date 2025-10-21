@@ -194,7 +194,7 @@ install_collections() {
 run_playbook() {
   pushd "$WORKDIR" >/dev/null
   local target_user target_home extra_vars
-  target_user="${SUDO_USER:-$USER}"
+  target_user="${SUDO_USER:-${USER:-$(id -un)}}"
   target_home="$(python3 - "$target_user" <<'PY'
 import os, pwd, sys
 user = sys.argv[1]
