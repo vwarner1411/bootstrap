@@ -365,12 +365,18 @@
     btop_target_version: "{{ (btop_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Determine btop asset name
+  ansible.builtin.set_fact:
+    btop_asset_name: >-
+      {{ {'x86_64': 'btop-x86_64-linux-musl.tbz', 'aarch64': 'btop-aarch64-linux-musl.tbz'}.get(arch_cpu, '') }}
+  when: ansible_facts.os_family == "Debian"
+
 - name: Set btop asset URL
   ansible.builtin.set_fact:
     btop_asset: >-
       {{
         (btop_release.json.assets | default([]))
-        | selectattr('name', 'match', '^btop-' ~ arch_cpu ~ '-linux-musl\\.tbz$')
+        | selectattr('name', 'equalto', btop_asset_name | default(''))
         | map(attribute='browser_download_url')
         | list
         | first
@@ -511,10 +517,11 @@
 - name: Set lsd asset URL
   ansible.builtin.set_fact:
     lsd_triple: "{{ arch_cpu ~ '-unknown-linux-gnu' }}"
+    lsd_asset_name: "lsd-{{ lsd_target_version }}-{{ lsd_triple }}.tar.gz"
     lsd_asset: >-
       {{
         (lsd_release.json.assets | default([]))
-        | selectattr('name', 'match', '^lsd-' ~ lsd_target_version ~ '-' ~ lsd_triple ~ '\\.tar\\.gz$')
+        | selectattr('name', 'equalto', lsd_asset_name)
         | map(attribute='browser_download_url')
         | list
         | first
@@ -654,10 +661,11 @@
 
 - name: Set fzf asset URL
   ansible.builtin.set_fact:
+    fzf_asset_name: "fzf-{{ fzf_target_version }}-linux_{{ arch_go }}.tar.gz"
     fzf_asset: >-
       {{
         (fzf_release.json.assets | default([]))
-        | selectattr('name', 'match', '^fzf-' ~ fzf_target_version ~ '-linux_' ~ arch_go ~ '\\.tar\\.gz$')
+        | selectattr('name', 'equalto', fzf_asset_name)
         | map(attribute='browser_download_url')
         | list
         | first
@@ -797,10 +805,11 @@
 
 - name: Set starship asset URL
   ansible.builtin.set_fact:
+    starship_asset_name: "starship-{{ arch_cpu }}-unknown-linux-gnu.tar.gz"
     starship_asset: >-
       {{
         (starship_release.json.assets | default([]))
-        | selectattr('name', 'match', '^starship-' ~ arch_cpu ~ '-unknown-linux-gnu\\.tar\\.gz$')
+        | selectattr('name', 'equalto', starship_asset_name)
         | map(attribute='browser_download_url')
         | list
         | first
@@ -940,10 +949,11 @@
 
 - name: Set yazi asset URL
   ansible.builtin.set_fact:
+    yazi_asset_name: "yazi-{{ arch_cpu }}-unknown-linux-gnu.tar.xz"
     yazi_asset: >-
       {{
         (yazi_release.json.assets | default([]))
-        | selectattr('name', 'match', '^yazi-' ~ arch_cpu ~ '-unknown-linux-gnu\\.tar\\.xz$')
+        | selectattr('name', 'equalto', yazi_asset_name)
         | map(attribute='browser_download_url')
         | list
         | first
@@ -1105,10 +1115,11 @@
 
 - name: Set mosh asset URL
   ansible.builtin.set_fact:
+    mosh_asset_name: "mosh-{{ mosh_target_version }}.tar.gz"
     mosh_asset: >-
       {{
         (mosh_release.json.assets | default([]))
-        | selectattr('name', 'match', '^mosh-' ~ mosh_target_version ~ '\\.tar\\.gz$')
+        | selectattr('name', 'equalto', mosh_asset_name)
         | map(attribute='browser_download_url')
         | list
         | first
