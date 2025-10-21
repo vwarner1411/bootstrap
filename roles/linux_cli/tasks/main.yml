@@ -100,6 +100,11 @@
       }}
   when: ansible_facts.os_family == "Debian"
 
+- name: Debug PowerShell asset selection
+  ansible.builtin.debug:
+    msg: "PowerShell asset URL: {{ powershell_asset }}"
+  when: ansible_facts.os_family == "Debian"
+
 - name: Download PowerShell release
   ansible.builtin.get_url:
     url: "{{ powershell_asset }}"
@@ -201,6 +206,10 @@
         | first
         | default('', true)
       }}
+  when: ansible_facts.os_family == "Debian"
+- name: Debug kitty asset selection
+  ansible.builtin.debug:
+    msg: "Kitty asset URL: {{ kitty_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if kitty install is required
@@ -348,6 +357,10 @@
         | default('', true)
       }}
   when: ansible_facts.os_family == "Debian"
+- name: Debug btop asset selection
+  ansible.builtin.debug:
+    msg: "btop asset URL: {{ btop_asset }}"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Determine if btop install is required
   ansible.builtin.set_fact:
@@ -473,6 +486,10 @@
         | default('', true)
       }}
   when: ansible_facts.os_family == "Debian"
+- name: Debug lsd asset selection
+  ansible.builtin.debug:
+    msg: "lsd asset URL: {{ lsd_asset }}"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Determine if lsd install is required
   ansible.builtin.set_fact:
@@ -596,6 +613,10 @@
         | first
         | default('', true)
       }}
+  when: ansible_facts.os_family == "Debian"
+- name: Debug fzf asset selection
+  ansible.builtin.debug:
+    msg: "fzf asset URL: {{ fzf_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if fzf install is required
@@ -721,6 +742,10 @@
         | default('', true)
       }}
   when: ansible_facts.os_family == "Debian"
+- name: Debug starship asset selection
+  ansible.builtin.debug:
+    msg: "Starship asset URL: {{ starship_asset }}"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Determine if starship install is required
   ansible.builtin.set_fact:
@@ -844,6 +869,10 @@
         | first
         | default('', true)
       }}
+  when: ansible_facts.os_family == "Debian"
+- name: Debug yazi asset selection
+  ansible.builtin.debug:
+    msg: "Yazi asset URL: {{ yazi_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if yazi install is required
@@ -991,6 +1020,10 @@
         | default('', true)
       }}
   when: ansible_facts.os_family == "Debian"
+- name: Debug mosh asset selection
+  ansible.builtin.debug:
+    msg: "Mosh asset URL: {{ mosh_asset }}"
+  when: ansible_facts.os_family == "Debian"
 
 - name: Determine if mosh install is required
   ansible.builtin.set_fact:
@@ -1131,6 +1164,10 @@
         | first
         | default('', true)
       }}
+  when: ansible_facts.os_family == "Debian"
+- name: Debug yt-dlp asset selection
+  ansible.builtin.debug:
+    msg: "yt-dlp asset URL: {{ ytdlp_asset }}"
   when: ansible_facts.os_family == "Debian"
 
 - name: Determine if yt-dlp install is required

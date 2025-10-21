@@ -2,6 +2,8 @@
   hosts: localhost
   gather_facts: true
   become: true
+  environment:
+    PATH: "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
   vars:
     profile: "{{ profile | default('desktop') }}"
   roles:
