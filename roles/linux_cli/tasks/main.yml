@@ -256,6 +256,10 @@
   ansible.builtin.set_fact:
     btop_target_version_raw: "{{ btop_release.json.tag_name | default('') }}"
     btop_target_version: "{{ btop_target_version_raw | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set btop asset URL
+  ansible.builtin.set_fact:
     btop_asset: >-
       {{
         (btop_release.json.assets | default([]))
@@ -265,19 +269,16 @@
         | first
         | default('', true)
       }}
-    btop_present: "{{ (btop_version_check.rc | default(1)) == 0 }}"
-    btop_present_version: >-
-      {{
-        (btop_version_check.stdout | default(''))
-        | regex_search('([0-9]+(\\.[0-9]+)+)')
-        | default('')
-      }}
-    btop_needs_install: >-
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if btop install is required
+  ansible.builtin.set_fact:
+    btop_install_required: >-
       {{
         (btop_asset | length > 0) and
         (
-          (not btop_present) or
-          (btop_present_version != btop_target_version)
+          (btop_version_check.rc | default(1)) != 0 or
+          (btop_version_check.stdout is defined and btop_target_version not in btop_version_check.stdout)
         )
       }}
   when: ansible_facts.os_family == "Debian"
@@ -289,7 +290,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
-    - btop_needs_install
+    - btop_install_required
 
 - name: Unpack btop release
   ansible.builtin.unarchive:
@@ -298,7 +299,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
-    - btop_needs_install
+    - btop_install_required
 
 - name: Install btop
   ansible.builtin.command:
@@ -307,7 +308,7 @@
   changed_when: true
   when:
     - ansible_facts.os_family == "Debian"
-    - btop_needs_install
+    - btop_install_required
 
 - name: Remove btop build directory
   ansible.builtin.file:
@@ -315,7 +316,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - btop_needs_install
+    - btop_install_required
 
 - name: Clean btop archive
   ansible.builtin.file:
@@ -323,7 +324,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
-    - btop_needs_install
+    - btop_install_required
 
 # lsd ##########################################################################
 - name: Check current lsd version
