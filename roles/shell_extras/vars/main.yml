@@ -11,5 +11,3 @@ shell_extras_zsh_plugins:
   - repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
     dest: "{{ shell_extras_oh_my_zsh_custom }}/plugins/zsh-syntax-highlighting"
     version: master
-shell_extras_oh_my_zsh_theme_repo: https://github.com/dracula/zsh.git
-shell_extras_oh_my_zsh_theme_dest: "{{ shell_extras_oh_my_zsh_custom }}/themes/dracula"

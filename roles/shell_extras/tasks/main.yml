@@ -27,7 +27,6 @@
     shell_extras_oh_my_zsh_dir: "{{ shell_extras_target_home }}/.oh-my-zsh"
     shell_extras_oh_my_zsh_custom: "{{ shell_extras_target_home }}/.oh-my-zsh/custom"
     shell_extras_zshrc_dir: "{{ shell_extras_target_home }}/.zshrc.d"
-    shell_extras_oh_my_zsh_theme_dest: "{{ shell_extras_target_home }}/.oh-my-zsh/custom/themes/dracula"
   become: false
 
 - name: Install oh-my-zsh
@@ -53,14 +52,6 @@
     version: "{{ item.version | default('master') }}"
     update: true
   loop: "{{ shell_extras_zsh_plugins }}"
-  become: false
-
-- name: Install Dracula theme for oh-my-zsh
-  ansible.builtin.git:
-    repo: "{{ shell_extras_oh_my_zsh_theme_repo }}"
-    dest: "{{ shell_extras_oh_my_zsh_theme_dest }}"
-    version: master
-    update: true
   become: false
 
 - name: Ensure Zsh completions directory exists
