@@ -20,6 +20,8 @@ Environment variables:
 - `REPO_BRANCH` (defaults to `bootstrap`)
 - `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
 
+The `server` profile skips desktop niceties (`powershell`, `kitty`, `starship`, `yt-dlp`) while still installing the core CLI stack.
+
 Example one-liners:
 
 ```bash

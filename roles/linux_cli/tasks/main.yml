@@ -796,13 +796,17 @@
   register: starship_version_check
   changed_when: false
   failed_when: false
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Compute existing starship version string
   ansible.builtin.set_fact:
     starship_version_pretty: >-
       {{ (starship_version_check.rc == 0) | ternary((starship_version_check.stdout | default('') | trim), 'not installed') }}
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Fetch latest starship release metadata
   ansible.builtin.uri:
@@ -815,12 +819,16 @@
   retries: 3
   delay: 2
   until: starship_release.status == 200
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Set starship release facts
   ansible.builtin.set_fact:
     starship_target_version: "{{ (starship_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Build starship asset candidate list
   ansible.builtin.set_fact:
@@ -846,17 +854,23 @@
           | list
         )
       }}
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Set starship asset URL
   ansible.builtin.set_fact:
     starship_available_assets: "{{ starship_release.json.assets | default([]) | map(attribute='name') | list }}"
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Initialize starship asset name
   ansible.builtin.set_fact:
     starship_asset_name: ""
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Select starship asset candidate
   ansible.builtin.set_fact:
@@ -866,6 +880,7 @@
     label: "{{ item }}"
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - (starship_asset_name | default('')) == ""
     - item in starship_available_assets
 
@@ -880,12 +895,15 @@
         | first
         | default('', true)
       }}
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 - name: Fail if no starship asset found
   ansible.builtin.fail:
     msg: "No matching starship release asset found for arch {{ arch_cpu }} (version {{ starship_target_version }})"
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - starship_asset | length == 0
 
 - name: Determine if starship install is required
@@ -898,7 +916,9 @@
           (starship_version_check.stdout is defined and starship_target_version not in starship_version_check.stdout)
         )
       }}
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Download starship release
   ansible.builtin.get_url:
@@ -907,6 +927,7 @@
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - starship_install_required
 
 - name: Remove previous starship build directory
@@ -915,6 +936,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - starship_install_required
 
 - name: Unpack starship release
@@ -924,6 +946,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - starship_install_required
 
 - name: Install starship binary
@@ -934,6 +957,7 @@
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - starship_install_required
 
 - name: Remove starship build artifacts
@@ -942,6 +966,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - starship_install_required
 
 - name: Clean starship archive
@@ -950,6 +975,7 @@
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
     - starship_install_required
 
 - name: Capture starship version after install
@@ -957,18 +983,24 @@
   register: starship_version_post
   changed_when: false
   failed_when: false
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Compute installed starship version string
   ansible.builtin.set_fact:
     starship_version_post_pretty: >-
       {{ (starship_version_post.rc == 0) | ternary((starship_version_post.stdout | default('') | trim), 'not installed') }}
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Report installed starship version
   ansible.builtin.debug:
     msg: "Starship version after install: {{ starship_version_post_pretty }}"
-  when: ansible_facts.os_family == "Debian"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
 
 - name: Check current yazi version
   ansible.builtin.command: yazi --version

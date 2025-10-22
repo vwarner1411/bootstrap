@@ -6,7 +6,7 @@
     PATH: "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
   vars:
     profile: "{{ profile | default('desktop') }}"
-    linux_cli_skip_tools: "{{ ['powershell', 'kitty', 'yt-dlp'] if (profile | default('desktop')) == 'server' else [] }}"
+    linux_cli_skip_tools: "{{ ['powershell', 'kitty', 'starship', 'yt-dlp'] if (profile | default('desktop')) == 'server' else [] }}"
   roles:
     - role: common_core
     - role: linux_cli
