@@ -847,21 +847,24 @@
     fastfetch_asset_candidates: >-
       {{
         (
-          fastfetch_arch_tokens
-          | map('regex_replace', '^(.*)$', 'fastfetch-linux-\\1.tar.gz')
-          | list
-        )
-        +
-        (
-          fastfetch_arch_tokens
-          | map('regex_replace', '^(.*)$', 'fastfetch-linux-\\1-polyfilled.tar.gz')
-          | list
-        )
-        +
-        (
-          (arch_cpu == 'x86_64') | ternary(['fastfetch-musl-amd64.tar.gz'], [])
-        )
-        | unique
+          (
+            fastfetch_arch_tokens
+            | map('regex_replace', '^', 'fastfetch-linux-')
+            | map('regex_replace', '$', '.tar.gz')
+            | list
+          )
+          +
+          (
+            fastfetch_arch_tokens
+            | map('regex_replace', '^', 'fastfetch-linux-')
+            | map('regex_replace', '$', '-polyfilled.tar.gz')
+            | list
+          )
+          +
+          (
+            (arch_cpu == 'x86_64') | ternary(['fastfetch-musl-amd64.tar.gz'], [])
+          )
+        ) | unique
       }}
   when: ansible_facts.os_family == "Debian"
 
