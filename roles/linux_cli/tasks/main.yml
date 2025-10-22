@@ -18,6 +18,15 @@
     state: present
   when: ansible_facts.os_family == "Debian"
 
+# Server profile needs kitty terminfo even when the full client is skipped
+- name: Install kitty terminfo package when kitty binary is omitted
+  ansible.builtin.apt:
+    name: kitty-terminfo
+    state: present
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('kitty' in linux_cli_skip_tools)
+
 - name: Define GitHub download staging directory
   ansible.builtin.set_fact:
     linux_cli_download_dir: /tmp/zshell-github-downloads
