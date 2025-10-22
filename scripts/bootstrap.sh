@@ -234,6 +234,56 @@ ensure_chezmoi() {
   fi
 }
 
+configure_chezmoi_profile() {
+  detect_target_context
+  local profile_value="${PROFILE:-desktop}"
+  local config_dir="$TARGET_HOME/.config/chezmoi"
+  local config_file="$config_dir/chezmoi.toml"
+
+  run_as_target mkdir -p "$config_dir"
+
+  run_as_target python3 - "$config_file" "$profile_value" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+profile = sys.argv[2]
+
+config = {"data": {}}
+if path.exists():
+    text = path.read_text(encoding="utf-8")
+    try:
+        import tomllib  # Python 3.11+
+    except ModuleNotFoundError:
+        tomllib = None
+    if tomllib:
+        try:
+            loaded = tomllib.loads(text) if text.strip() else {}
+            if isinstance(loaded, dict):
+                config.update({k: v for k, v in loaded.items() if isinstance(v, dict)})
+        except Exception:
+            pass
+
+config.setdefault("data", {})
+config["data"]["bootstrap_profile"] = profile
+
+lines = []
+for section, values in config.items():
+    lines.append(f"[{section}]")
+    for key, value in values.items():
+        if isinstance(value, str):
+            escaped = value.replace('"', '\\"')
+            lines.append(f'{key} = "{escaped}"')
+        elif isinstance(value, bool):
+            lines.append(f"{key} = {'true' if value else 'false'}")
+        else:
+            lines.append(f"{key} = {value}")
+    lines.append("")
+
+path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+PY
+}
+
 clone_repo() {
   if command_exists git; then
     local current_root
@@ -318,6 +368,7 @@ main() {
       ;;
   esac
   ensure_chezmoi
+  configure_chezmoi_profile
   clone_repo
   run_chezmoi
   install_collections

@@ -69,22 +69,3 @@
     state: directory
     mode: "0755"
   become: false
-
-- name: Check for managed .zshrc
-  ansible.builtin.stat:
-    path: "{{ shell_extras_target_home }}/.zshrc"
-  register: shell_extras_zshrc_stat
-  become: false
-
-- name: Wrap starship init on server profile
-  ansible.builtin.replace:
-    path: "{{ shell_extras_target_home }}/.zshrc"
-    regexp: '^\s*eval "\$\((?:starship init zsh)\)"\s*$'
-    replace: |-
-      if command -v starship >/dev/null 2>&1; then
-        eval "$(starship init zsh)"
-      fi
-  become: false
-  when:
-    - (profile | default('desktop')) == 'server'
-    - shell_extras_zshrc_stat.stat.exists
