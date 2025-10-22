@@ -256,15 +256,26 @@ clone_repo() {
 
 run_chezmoi() {
   detect_target_context
-  local chez_cmd
+  local chez_cmd init_cmd init_repo repo_path_literal
   chez_cmd="export PATH=\"\$HOME/.local/bin:\$PATH\";"
   chez_cmd+=" if chezmoi git -- status >/dev/null 2>&1; then"
   chez_cmd+="   echo '[chezmoi] Applying existing state' >&2;"
   chez_cmd+="   chezmoi git -- pull --ff-only || true;"
   chez_cmd+="   chezmoi apply;"
   chez_cmd+=" else"
+  init_repo="$CHEZMOI_REPO"
+  if [[ "$init_repo" == file://* ]]; then
+    init_repo="${init_repo#file://}"
+  fi
+  if [[ "$init_repo" == /* || "$init_repo" == ./* || "$init_repo" == ../* || "$init_repo" == ~* ]]; then
+    repo_path_literal=$(printf '%q' "$init_repo")
+    init_cmd="chezmoi init --apply --source ${repo_path_literal}"
+  else
+    repo_path_literal=$(printf '%q' "$CHEZMOI_REPO")
+    init_cmd="chezmoi init --apply ${repo_path_literal}"
+  fi
   chez_cmd+="   echo '[chezmoi] Initializing from $CHEZMOI_REPO' >&2;"
-  chez_cmd+="   chezmoi init --apply $CHEZMOI_REPO;"
+  chez_cmd+="   $init_cmd;"
   chez_cmd+=" fi"
   run_as_target bash -lc "$chez_cmd"
 }
