@@ -419,6 +419,8 @@ main() {
   run_chezmoi
   install_collections
   run_playbook
+  log "Re-applying chezmoi post-playbook"
+  run_chezmoi
   log "Bootstrap completed successfully"
 }
 
