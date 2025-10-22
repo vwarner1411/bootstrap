@@ -55,7 +55,7 @@ detect_target_context() {
   detected_user="${TARGET_USER_OVERRIDE:-${SUDO_USER:-${USER:-$(id -un)}}}"
   TARGET_USER="$detected_user"
 
-  if [ -n "$TARGET_HOME_OVERRIDE" ]; then
+  if [ -n "${TARGET_HOME_OVERRIDE:-}" ]; then
     TARGET_HOME="$TARGET_HOME_OVERRIDE"
     return
   fi
