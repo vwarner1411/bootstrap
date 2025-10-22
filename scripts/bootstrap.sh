@@ -258,11 +258,9 @@ run_chezmoi() {
   detect_target_context
   local chez_cmd
   chez_cmd="export PATH=\"\$HOME/.local/bin:\$PATH\";"
-  chez_cmd+=" if chezmoi source-path >/dev/null 2>&1; then"
+  chez_cmd+=" if chezmoi git -- status >/dev/null 2>&1; then"
   chez_cmd+="   echo '[chezmoi] Applying existing state' >&2;"
-  chez_cmd+="   if chezmoi git -- status >/dev/null 2>&1; then"
-  chez_cmd+="     chezmoi git -- pull --ff-only || true;"
-  chez_cmd+="   fi;"
+  chez_cmd+="   chezmoi git -- pull --ff-only || true;"
   chez_cmd+="   chezmoi apply;"
   chez_cmd+=" else"
   chez_cmd+="   echo '[chezmoi] Initializing from $CHEZMOI_REPO' >&2;"
