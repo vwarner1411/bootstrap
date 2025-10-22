@@ -353,9 +353,11 @@ run_chezmoi() {
   local chez_cmd init_cmd init_repo repo_path_literal
   chez_cmd="export PATH=\"\$HOME/.local/bin:\$PATH\";"
   chez_cmd+=" if chezmoi git -- status >/dev/null 2>&1; then"
-  chez_cmd+="   echo '[chezmoi] Applying existing state' >&2;"
-  chez_cmd+="   chezmoi git -- pull --ff-only || true;"
-  chez_cmd+="   chezmoi apply;"
+  chez_cmd+="   echo '[chezmoi] Updating existing state' >&2;"
+  chez_cmd+="   if ! chezmoi update --apply; then"
+  chez_cmd+="     echo '[chezmoi] update failed; attempting direct apply' >&2;"
+  chez_cmd+="     chezmoi apply;"
+  chez_cmd+="   fi;"
   chez_cmd+=" else"
   init_repo="$CHEZMOI_REPO"
   if [[ "$init_repo" == file://* ]]; then
