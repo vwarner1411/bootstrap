@@ -244,43 +244,87 @@ configure_chezmoi_profile() {
 
   run_as_target python3 - "$config_file" "$profile_value" <<'PY'
 import sys
+from collections import OrderedDict
 from pathlib import Path
 
 path = Path(sys.argv[1])
 profile = sys.argv[2]
 
-config = {"data": {}}
-if path.exists():
-    text = path.read_text(encoding="utf-8")
+def load_toml(text):
+    if not text.strip():
+        return {}
     try:
         import tomllib  # Python 3.11+
+        return tomllib.loads(text)
     except ModuleNotFoundError:
-        tomllib = None
-    if tomllib:
         try:
-            loaded = tomllib.loads(text) if text.strip() else {}
-            if isinstance(loaded, dict):
-                config.update({k: v for k, v in loaded.items() if isinstance(v, dict)})
-        except Exception:
-            pass
+            import tomli
+            return tomli.loads(text)
+        except ModuleNotFoundError:
+            return {}
+    except Exception:
+        return {}
 
-config.setdefault("data", {})
-config["data"]["bootstrap_profile"] = profile
+def ensure_ordered(mapping):
+    ordered = OrderedDict()
+    for key, value in mapping.items():
+        if isinstance(value, dict):
+            ordered[key] = ensure_ordered(value)
+        else:
+            ordered[key] = value
+    return ordered
+
+scalars = OrderedDict()
+sections = OrderedDict()
+
+if path.exists():
+    existing = load_toml(path.read_text(encoding="utf-8"))
+    if isinstance(existing, dict):
+        existing = ensure_ordered(existing)
+        for key, value in existing.items():
+            if isinstance(value, dict):
+                sections[key] = ensure_ordered(value)
+            else:
+                scalars[key] = value
+
+data_section = sections.get("data")
+if not isinstance(data_section, dict):
+    data_section = OrderedDict()
+sections["data"] = data_section
+data_section["bootstrap_profile"] = profile
+
+def format_value(value):
+    if isinstance(value, str):
+        escaped = (
+            value.replace("\\", "\\\\")
+                 .replace("\"", "\\\"")
+        )
+        return f"\"{escaped}\""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, list):
+        return "[ " + ", ".join(format_value(item) for item in value) + " ]"
+    if value is None:
+        return "\"\""
+    return format_value(str(value))
 
 lines = []
-for section, values in config.items():
-    lines.append(f"[{section}]")
-    for key, value in values.items():
-        if isinstance(value, str):
-            escaped = value.replace('"', '\\"')
-            lines.append(f'{key} = "{escaped}"')
-        elif isinstance(value, bool):
-            lines.append(f"{key} = {'true' if value else 'false'}")
-        else:
-            lines.append(f"{key} = {value}")
+for key, value in scalars.items():
+    lines.append(f"{key} = {format_value(value)}")
     lines.append("")
 
-path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+for section, values in sections.items():
+    lines.append(f"[{section}]")
+    for key, value in values.items():
+        lines.append(f"{key} = {format_value(value)}")
+    lines.append("")
+
+result = "\n".join(lines).strip()
+if result:
+    result += "\n"
+path.write_text(result, encoding="utf-8")
 PY
 }
 
