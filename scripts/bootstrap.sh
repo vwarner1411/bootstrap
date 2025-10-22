@@ -7,6 +7,9 @@ CHEZMOI_REPO="${CHEZMOI_REPO:-https://github.com/vwarner1411/dotfiles.git}"
 WORKDIR="${WORKDIR:-$HOME/.local/share/zshell}"
 PROFILE="${PROFILE:-desktop}"
 
+TARGET_USER="${TARGET_USER_OVERRIDE:-}"
+TARGET_HOME="${TARGET_HOME_OVERRIDE:-}"
+
 # ensure local bin is first so freshly installed tools are visible
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -41,6 +44,69 @@ detect_os() {
       ;;
     *) echo "unsupported" ;;
   esac
+}
+
+detect_target_context() {
+  if [ -n "$TARGET_USER" ] && [ -n "$TARGET_HOME" ]; then
+    return
+  fi
+
+  local detected_user detected_home
+  detected_user="${TARGET_USER_OVERRIDE:-${SUDO_USER:-${USER:-$(id -un)}}}"
+  TARGET_USER="$detected_user"
+
+  if [ -n "$TARGET_HOME_OVERRIDE" ]; then
+    TARGET_HOME="$TARGET_HOME_OVERRIDE"
+    return
+  fi
+
+  if command_exists python3; then
+    detected_home="$(python3 - "$TARGET_USER" <<'PY'
+import os, pwd, sys
+user = sys.argv[1]
+if not user:
+    print("", end="")
+else:
+    try:
+        print(pwd.getpwnam(user).pw_dir, end="")
+    except KeyError:
+        print("", end="")
+PY
+    )"
+  else
+    detected_home=""
+  fi
+
+  if [ -z "$detected_home" ] && command_exists getent; then
+    detected_home="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6 || true)"
+  fi
+
+  if [ -z "$detected_home" ]; then
+    if [ "$TARGET_USER" = "root" ]; then
+      detected_home="/root"
+    else
+      detected_home="/home/$TARGET_USER"
+    fi
+  fi
+
+  TARGET_HOME="$detected_home"
+}
+
+run_as_target() {
+  detect_target_context
+  if [ "$(id -un)" = "$TARGET_USER" ]; then
+    "$@"
+    return
+  fi
+
+  if command_exists sudo; then
+    sudo -u "$TARGET_USER" -- "$@"
+  else
+    local cmd
+    cmd=$(printf '%q ' "$@")
+    cmd=${cmd% }
+    su - "$TARGET_USER" -c "$cmd"
+  fi
 }
 
 ensure_prereqs_linux() {
@@ -140,16 +206,32 @@ ensure_ansible_macos() {
 }
 
 ensure_chezmoi() {
-  if command_exists chezmoi; then
-    log "chezmoi already installed"
-    return
+  detect_target_context
+
+  if run_as_target sh -c "command -v chezmoi >/dev/null 2>&1"; then
+    log "chezmoi already installed for ${TARGET_USER}"
+  else
+    log "Installing chezmoi for ${TARGET_USER}"
+    run_as_target mkdir -p "$TARGET_HOME/.local/bin"
+    if ! run_as_target sh -c "curl -fsLS get.chezmoi.io | sh -s -- -b \"\$HOME/.local/bin\""; then
+      err "chezmoi installation failed"
+      exit 1
+    fi
   fi
-  log "Installing chezmoi from upstream script"
-  if ! sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"; then
-    err "chezmoi installation failed"
-    exit 1
+
+  export PATH="$TARGET_HOME/.local/bin:$PATH"
+
+  run_as_target sh -c "touch \"\$HOME/.profile\""
+  run_as_target sh -c "grep -qs 'export PATH=\"\$HOME/.local/bin:\$PATH\"' \"\$HOME/.profile\" || printf '\n# Added by zshell bootstrap\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n' >> \"\$HOME/.profile\""
+
+  if [ -x "$TARGET_HOME/.local/bin/chezmoi" ]; then
+    if [ -w /usr/local/bin ]; then
+      ln -sf "$TARGET_HOME/.local/bin/chezmoi" /usr/local/bin/chezmoi || true
+    elif command_exists sudo; then
+      sudo mkdir -p /usr/local/bin || true
+      sudo ln -sf "$TARGET_HOME/.local/bin/chezmoi" /usr/local/bin/chezmoi || true
+    fi
   fi
-  export PATH="$HOME/.local/bin:$PATH"
 }
 
 clone_repo() {
@@ -193,19 +275,9 @@ install_collections() {
 
 run_playbook() {
   pushd "$WORKDIR" >/dev/null
-  local target_user target_home extra_vars
-  target_user="${SUDO_USER:-${USER:-$(id -un)}}"
-  target_home="$(python3 - "$target_user" <<'PY'
-import os, pwd, sys
-user = sys.argv[1]
-try:
-    print(pwd.getpwnam(user).pw_dir)
-except KeyError:
-    print(os.environ.get("HOME", ""))
-PY
-)"
-  target_home="${target_home:-$HOME}"
-  extra_vars="profile=${PROFILE} shell_user=${target_user} shell_home=${target_home}"
+  detect_target_context
+  local extra_vars
+  extra_vars="profile=${PROFILE} shell_user=${TARGET_USER} shell_home=${TARGET_HOME}"
   local cmd=(ansible-playbook playbooks/bootstrap.yml --extra-vars "$extra_vars")
   if [ "$EUID" -ne 0 ] && [ -t 0 ]; then
     cmd+=(--ask-become-pass)

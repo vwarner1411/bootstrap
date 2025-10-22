@@ -20,6 +20,18 @@ Environment variables:
 - `REPO_BRANCH` (defaults to `bootstrap`)
 - `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
 
+Example one-liners:
+
+```bash
+# Desktop workstation
+PROFILE=desktop CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/bootstrap/scripts/bootstrap.sh)"
+
+# Server baseline
+PROFILE=server CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/bootstrap/scripts/bootstrap.sh)"
+```
+
 Re-run the same command any time to upgrade packages and reapply dotfiles.
 
 ## What Gets Installed
