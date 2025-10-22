@@ -24,4 +24,5 @@ common_core_debian_packages:
   - iotop
   - iftop
   - unzip
+  - fontconfig
   - pipx
