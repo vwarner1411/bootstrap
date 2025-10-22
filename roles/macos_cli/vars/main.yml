@@ -17,6 +17,7 @@ macos_cli_brew_packages:
   - lsd
   - yazi
   - fzf
+  - fastfetch
   - yt-dlp
   - ansible
   - powershell
