@@ -379,10 +379,10 @@ run_chezmoi() {
   fi
   if [[ "$init_repo" == /* || "$init_repo" == ./* || "$init_repo" == ../* || "$init_repo" == ~* ]]; then
     repo_path_literal=$(printf '%q' "$init_repo")
-    init_cmd="chezmoi init --apply --source ${repo_path_literal}"
+    init_cmd="chezmoi init --apply --force --source ${repo_path_literal}"
   else
     repo_path_literal=$(printf '%q' "$CHEZMOI_REPO")
-    init_cmd="chezmoi init --apply ${repo_path_literal}"
+    init_cmd="chezmoi init --apply --force ${repo_path_literal}"
   fi
   chez_cmd+="   echo '[chezmoi] Initializing from $CHEZMOI_REPO' >&2;"
   chez_cmd+="   $init_cmd;"
