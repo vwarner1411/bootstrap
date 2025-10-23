@@ -52,6 +52,10 @@
     server_prep_user: "{{ server_prep_user | default(ansible_env.USER) }}"
 
   pre_tasks:
+    - name: Normalize DNS input string
+      ansible.builtin.set_fact:
+        prep_dns_raw: "{{ prep_dns_servers | default('') | trim }}"
+
     - name: Compute prefix length from netmask
       ansible.builtin.set_fact:
         prep_prefix: "{{ netmask_prefix_map[prep_netmask | trim] | default(omit) }}"
@@ -65,9 +69,9 @@
       ansible.builtin.set_fact:
         prep_dns_list: >-
           {{
-            prep_dns_servers | trim | length > 0
+            (prep_dns_raw | length > 0)
             | ternary(
-                prep_dns_servers.split(',') | map('trim') | reject('equalto', '') | list,
+                prep_dns_raw | split(',') | map('trim') | reject('equalto', '') | list,
                 []
               )
           }}
