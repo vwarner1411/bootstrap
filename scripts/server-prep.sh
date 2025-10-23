@@ -12,7 +12,7 @@ if [[ -z "$ANSIBLE_BIN_RESOLVED" ]]; then
   fi
 fi
 
-SCRIPT_DIR="${ORIGINAL_HOME}/.local/share/chezmoi/scripts/server_prep"
+SCRIPT_DIR="${ORIGINAL_HOME}/.local/share/zshell/server_prep"
 PLAYBOOK="${SCRIPT_DIR}/server_prep.yml"
 
 if [[ ! -f "$PLAYBOOK" ]]; then

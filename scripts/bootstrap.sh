@@ -395,8 +395,19 @@ stage_server_prep_assets() {
     return
   fi
   detect_target_context
-  local prep_dir="$TARGET_HOME/.local/share/chezmoi/scripts/server_prep"
-  run_as_target mkdir -p "$prep_dir"
+  local prep_dir="$TARGET_HOME/.local/share/zshell/server_prep"
+  local old_prep_dir="$TARGET_HOME/.local/share/chezmoi/scripts/server_prep"
+  local old_target_dir="$TARGET_HOME/scripts/server_prep"
+  local old_target_script="$TARGET_HOME/scripts/server-prep.sh"
+  if run_as_target test -d "$old_prep_dir"; then
+    run_as_target rm -rf "$old_prep_dir"
+  fi
+  if run_as_target test -d "$old_target_dir"; then
+    run_as_target rm -rf "$old_target_dir"
+  fi
+  if run_as_target test -e "$old_target_script"; then
+    run_as_target rm -f "$old_target_script"
+  fi
   run_as_target mkdir -p "$prep_dir/templates"
   run_as_target install -m 0644 "$WORKDIR/playbooks/server_prep.yml" "$prep_dir/server_prep.yml"
   run_as_target install -m 0644 "$WORKDIR/playbooks/templates/server-prep-netplan.yaml.j2" "$prep_dir/templates/server-prep-netplan.yaml.j2"
