@@ -396,9 +396,6 @@ stage_server_prep_assets() {
   fi
   detect_target_context
   local prep_dir="$TARGET_HOME/.local/share/chezmoi/scripts/server_prep"
-  if run_as_target test -f "$prep_dir/server_prep.yml"; then
-    return
-  fi
   run_as_target mkdir -p "$prep_dir"
   run_as_target mkdir -p "$prep_dir/templates"
   run_as_target install -m 0644 "$WORKDIR/playbooks/server_prep.yml" "$prep_dir/server_prep.yml"
