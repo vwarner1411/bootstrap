@@ -1061,7 +1061,7 @@
 - name: Discover existing MOTD scripts
   ansible.builtin.find:
     paths: /etc/update-motd.d
-    file_type: file
+    file_type: any
   register: motd_scripts
   when:
     - ansible_facts.os_family == "Debian"
@@ -1071,12 +1071,14 @@
   ansible.builtin.file:
     path: "{{ item.path }}"
     mode: "0644"
+    follow: true
   loop: "{{ motd_scripts.files | default([]) }}"
   loop_control:
     label: "{{ item.path }}"
   when:
     - ansible_facts.os_family == "Debian"
     - profile == "server"
+    - item.type in ['file', 'link']
     - item.path != '/etc/update-motd.d/00-fastfetch-motd'
 
 - name: Check current starship version
