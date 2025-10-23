@@ -996,6 +996,89 @@
     msg: "Fastfetch version after install: {{ fastfetch_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
 
+- name: Install fastfetch MOTD configuration
+  ansible.builtin.copy:
+    dest: /etc/update-motd.d/fastfetch.jsonc
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {
+        "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
+        "logo": {
+          "type": "none"
+        },
+        "modules": [
+          "os",
+          "kernel",
+          "uptime",
+          "packages",
+          "shell",
+          "separator",
+          "cpu",
+          {
+            "type": "CPUUsage",
+            "separate": true
+          },
+          {
+            "type": "loadavg",
+            "compact": false,
+            "key": " {duration>2}m"
+          },
+          "separator",
+          "memory",
+          "swap",
+          "separator",
+          "disk",
+          "separator",
+          "localip"
+        ]
+      }
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+
+- name: Install fastfetch MOTD script
+  ansible.builtin.copy:
+    dest: /etc/update-motd.d/00-fastfetch-motd
+    mode: "0755"
+    owner: root
+    group: root
+    content: |
+      #!/bin/sh
+      FASTFETCH_CFG="/etc/update-motd.d/fastfetch.jsonc"
+      if command -v fastfetch >/dev/null 2>&1; then
+        if [ -r "$FASTFETCH_CFG" ]; then
+          fastfetch --load-config "$FASTFETCH_CFG" 2>/dev/null || fastfetch 2>/dev/null
+        else
+          fastfetch 2>/dev/null
+        fi
+      fi
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+
+- name: Discover existing MOTD scripts
+  ansible.builtin.find:
+    paths: /etc/update-motd.d
+    file_type: file
+  register: motd_scripts
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+
+- name: Disable default MOTD scripts
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "0644"
+  loop: "{{ motd_scripts.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+    - item.path != '/etc/update-motd.d/00-fastfetch-motd'
+
 - name: Check current starship version
   ansible.builtin.command: starship --version
   register: starship_version_check
