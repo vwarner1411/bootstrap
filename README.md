@@ -11,13 +11,13 @@ Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu toda
 Interactive shells (TTY) will prompt for sudo when needed.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/bootstrap/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh | bash
 ```
 
 Environment variables:
 
 - `PROFILE=server|desktop` (default `desktop`)
-- `REPO_BRANCH` (defaults to `bootstrap`)
+- `REPO_BRANCH` (defaults to `main`)
 - `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
 
 The `server` profile skips desktop niceties (`powershell`, `kitty`, `starship`, `yt-dlp`) while still installing the core CLI stack.
@@ -27,11 +27,11 @@ Example one-liners:
 ```bash
 # Desktop workstation
 PROFILE=desktop CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/bootstrap/scripts/bootstrap.sh)"
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh)"
 
 # Server baseline
 PROFILE=server CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/bootstrap/scripts/bootstrap.sh)"
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh)"
 ```
 
 Re-run the same command any time to upgrade packages and reapply dotfiles.

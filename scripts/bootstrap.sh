@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/vwarner1411/zshell.git}"
-REPO_BRANCH="${REPO_BRANCH:-bootstrap}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
 CHEZMOI_REPO="${CHEZMOI_REPO:-https://github.com/vwarner1411/dotfiles.git}"
 WORKDIR="${WORKDIR:-$HOME/.local/share/zshell}"
 PROFILE="${PROFILE:-desktop}"
