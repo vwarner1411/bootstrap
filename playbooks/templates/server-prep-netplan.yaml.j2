@@ -1,0 +1,16 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{ prep_primary_interface }}:
+      dhcp4: false
+      addresses:
+        - {{ prep_ip_address }}/{{ prep_prefix }}
+      gateway4: {{ prep_gateway }}
+{% if prep_dns_list | length > 0 %}
+      nameservers:
+        addresses:
+{% for ns in prep_dns_list %}
+          - {{ ns }}
+{% endfor %}
+{% endif %}

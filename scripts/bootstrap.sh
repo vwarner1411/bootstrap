@@ -390,6 +390,24 @@ run_chezmoi() {
   run_as_target bash -lc "$chez_cmd"
 }
 
+stage_server_prep_assets() {
+  if [ "${PROFILE:-desktop}" != "server" ]; then
+    return
+  fi
+  detect_target_context
+  local prep_dir="$TARGET_HOME/.local/share/chezmoi/scripts/server_prep"
+  if run_as_target test -f "$prep_dir/server_prep.yml"; then
+    return
+  fi
+  run_as_target mkdir -p "$prep_dir"
+  run_as_target mkdir -p "$prep_dir/templates"
+  run_as_target install -m 0644 "$WORKDIR/playbooks/server_prep.yml" "$prep_dir/server_prep.yml"
+  run_as_target install -m 0644 "$WORKDIR/playbooks/templates/server-prep-netplan.yaml.j2" "$prep_dir/templates/server-prep-netplan.yaml.j2"
+  run_as_target install -m 0755 "$WORKDIR/scripts/server-prep.sh" "$prep_dir/server-prep.sh"
+  run_as_target ln -sf "$prep_dir/server-prep.sh" "$TARGET_HOME/server-prep.sh"
+  log "Staged server prep playbook at $prep_dir"
+}
+
 install_collections() {
   log "Installing Ansible collections"
   ensure_directory "$WORKDIR/collections"
@@ -433,6 +451,7 @@ main() {
   run_chezmoi
   install_collections
   run_playbook
+  stage_server_prep_assets
   log "Bootstrap completed successfully"
 }
 

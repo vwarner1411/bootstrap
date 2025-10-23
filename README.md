@@ -36,6 +36,10 @@ PROFILE=server CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
 
 Re-run the same command any time to upgrade packages and reapply dotfiles.
 
+## Server Prep Script
+
+When the server profile is bootstrapped, a helper script `~/server-prep.sh` is staged (with the playbook stored under `~/.local/share/chezmoi/scripts/server_prep/`). Run it manually to harden a VM before turning it into a template—it prompts for hostname and static networking, disables cloud-init, refreshes SSH host keys, applies the requested sysctl values, scrubs logs/history, and reboots when finished.
+
 ## What Gets Installed
 
 | Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
