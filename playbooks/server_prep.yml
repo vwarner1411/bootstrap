@@ -125,12 +125,6 @@
         group: root
         mode: "0644"
 
-    - name: Generate netplan configuration
-      ansible.builtin.command: netplan generate
-
-    - name: Apply netplan configuration
-      ansible.builtin.command: netplan apply
-
     - name: Reset machine-id files
       ansible.builtin.file:
         path: "{{ item }}"
@@ -238,6 +232,7 @@
         msg:
           - "Server prep tasks complete."
           - "Hostname set to {{ prep_hostname }} with static IP {{ prep_ip_address }}/{{ prep_prefix }}."
+          - "Netplan config installed at /etc/netplan/01-server-prep.yaml (applies after reboot)."
           - "System will reboot after confirmation."
 
     - name: Confirm before reboot
