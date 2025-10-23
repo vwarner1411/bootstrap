@@ -40,12 +40,18 @@ Re-run the same command any time to upgrade packages and reapply dotfiles.
 
 When the server profile is bootstrapped, a helper script `~/server-prep.sh` is staged (with the playbook stored under `~/.local/share/bootstrap/server_prep/`). Run it manually to harden a VM before turning it into a template—it prompts for hostname and static networking, disables cloud-init, refreshes SSH host keys, applies the requested sysctl values, scrubs logs/history, and reboots when finished.
 
+```bash
+sudo ~/server-prep.sh
+```
+
+> Supported on Ubuntu Server 22.04/24.04. The playbook will ask for the new hostname, IP details, and confirmation before rebooting.
+
 ## What Gets Installed
 
 | Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
 |---------------------|-----------------------------------------------|-------------------------------------------------------------------|
 | Core CLI            | git, curl, wget, rsync, jq, ncdu, tree, lynx  | Same set using `apt`, plus python3/pip, build-essential, sysstat  |
-| Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autocomplete, syntax-highlighting) |
+| Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autoupdate, completions, syntax-highlighting) |
 | Prompt/UX           | starship, fastfetch, lsd, yazi, fzf, btop, kitty | Latest GitHub releases for starship, fastfetch, lsd, yazi, fzf, btop, kitty |
 | Development         | neovim, ansible, Powershell, yt-dlp           | Latest GitHub releases for Ansible CLI, PowerShell, yt-dlp        |
 | Dotfiles            | Managed via `chezmoi init --apply`            | Same dotfiles source                                              |
