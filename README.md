@@ -1,6 +1,6 @@
 # Bootstrap Environment
 
-Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu today, Debian/Omarchy next). The repo delivers:
+Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu today, Debian/Arch next). The repo delivers:
 
 - A single `curl` entrypoint that installs prerequisites, syncs `chezmoi` dotfiles, and applies Ansible roles.
 - Ansible playbooks/roles for idempotent package management without Homebrew on Linux.
