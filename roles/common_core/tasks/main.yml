@@ -1,0 +1,57 @@
+- name: Include OS-specific variable defaults
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_facts.os_family | lower }}.yml"
+        - default.yml
+      paths:
+        - "{{ role_path }}/vars"
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_facts.os_family == "Debian"
+
+- name: Upgrade installed packages (Debian)
+  ansible.builtin.apt:
+    upgrade: dist
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install core packages on Debian-based systems
+  ansible.builtin.apt:
+    name: "{{ common_core_debian_packages }}"
+    state: present
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install open-vm-tools on server profile
+  ansible.builtin.apt:
+    name: open-vm-tools
+    state: present
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile | lower == "server"
+
+- name: Ensure prerequisite directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /usr/local/bin
+    - /usr/local/lib
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure Homebrew is installed (macOS)
+  community.general.homebrew:
+    name: []
+    update_homebrew: false
+    state: present
+  when: ansible_facts.system == "Darwin"
+
+- name: Install core packages with Homebrew (macOS)
+  community.general.homebrew:
+    name: "{{ common_core_brew_packages }}"
+    state: latest
+    update_homebrew: true
+  when: ansible_facts.system == "Darwin"

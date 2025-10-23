@@ -1,0 +1,251 @@
+- name: Prepare server for templating
+  hosts: localhost
+  gather_facts: true
+  become: true
+  connection: local
+
+  vars_prompt:
+    - name: prep_hostname
+      prompt: "Enter the hostname for this server"
+      private: false
+    - name: prep_ip_address
+      prompt: "Enter the static IPv4 address (e.g. 192.168.1.10)"
+      private: false
+    - name: prep_netmask
+      prompt: "Enter the subnet mask (e.g. 255.255.255.0)"
+      private: false
+    - name: prep_gateway
+      prompt: "Enter the default gateway"
+      private: false
+    - name: prep_dns_servers
+      prompt: "Enter DNS servers (comma separated, optional)"
+      private: false
+      default: ""
+
+  vars:
+    netmask_prefix_map:
+      255.0.0.0: 8
+      255.128.0.0: 9
+      255.192.0.0: 10
+      255.224.0.0: 11
+      255.240.0.0: 12
+      255.248.0.0: 13
+      255.252.0.0: 14
+      255.254.0.0: 15
+      255.255.0.0: 16
+      255.255.128.0: 17
+      255.255.192.0: 18
+      255.255.224.0: 19
+      255.255.240.0: 20
+      255.255.248.0: 21
+      255.255.252.0: 22
+      255.255.254.0: 23
+      255.255.255.0: 24
+      255.255.255.128: 25
+      255.255.255.192: 26
+      255.255.255.224: 27
+      255.255.255.240: 28
+      255.255.255.248: 29
+      255.255.255.252: 30
+      255.255.255.254: 31
+    server_prep_user_home: "{{ server_prep_user_home | default(ansible_env.HOME) }}"
+    server_prep_user: "{{ server_prep_user | default(ansible_env.USER) }}"
+
+  pre_tasks:
+    - name: Normalize DNS input string
+      ansible.builtin.set_fact:
+        prep_dns_raw: "{{ prep_dns_servers | default('') | trim }}"
+
+    - name: Compute prefix length from netmask
+      ansible.builtin.set_fact:
+        prep_prefix: "{{ netmask_prefix_map[prep_netmask | trim] | default(omit) }}"
+
+    - name: Validate netmask
+      ansible.builtin.fail:
+        msg: "Unsupported subnet mask: {{ prep_netmask }}"
+      when: prep_prefix is undefined
+
+    - name: Parse DNS servers
+      ansible.builtin.set_fact:
+        prep_dns_list: >-
+          {{
+            (prep_dns_raw | length > 0)
+            | ternary(
+                prep_dns_raw | split(',') | map('trim') | reject('equalto', '') | list,
+                []
+              )
+          }}
+
+    - name: Determine primary network interface
+      ansible.builtin.set_fact:
+        prep_primary_interface: "{{ ansible_default_ipv4.interface | default(omit) }}"
+
+    - name: Ensure primary interface is detected
+      ansible.builtin.fail:
+        msg: "Unable to determine default network interface. Please ensure networking is configured."
+      when: prep_primary_interface is undefined
+
+  tasks:
+    - name: Disable cloud-init services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+        masked: true
+      loop:
+        - cloud-init
+        - cloud-config
+        - cloud-final
+        - cloud-init-local
+
+    - name: Disable cloud-init via config flag
+      ansible.builtin.file:
+        path: /etc/cloud/cloud-init.disabled
+        state: touch
+
+    - name: Remove cloud-init state
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/cloud
+        - /var/log/cloud-init.log
+        - /var/log/cloud-init-output.log
+
+    - name: Remove cloud-init netplan file
+      ansible.builtin.file:
+        path: /etc/netplan/50-cloud-init.yaml
+        state: absent
+
+    - name: Deploy static netplan configuration
+      ansible.builtin.template:
+        src: templates/server-prep-netplan.yaml.j2
+        dest: /etc/netplan/01-server-prep.yaml
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Generate netplan configuration
+      ansible.builtin.command: netplan generate
+
+    - name: Apply netplan configuration
+      ansible.builtin.command: netplan apply
+
+    - name: Reset machine-id files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/machine-id
+        - /var/lib/dbus/machine-id
+
+    - name: Create blank machine-id placeholder
+      ansible.builtin.copy:
+        dest: /etc/machine-id
+        content: ""
+        mode: "0644"
+
+    - name: Remove existing SSH host keys
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ lookup('ansible.builtin.fileglob', '/etc/ssh/ssh_host_*', wantlist=True) }}"
+
+    - name: Regenerate SSH host keys
+      ansible.builtin.command: ssh-keygen -A
+
+    - name: Configure sysctl defaults for template
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-server-template.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          vm.swappiness=1
+          vm.vfs_cache_pressure=1000
+          vm.watermark_boost_factor=0
+          vm.watermark_scale_factor=125
+          vm.zone_reclaim_mode=0
+
+    - name: Reload sysctl configuration
+      ansible.builtin.command: sysctl --system
+
+    - name: Update system hostname
+      ansible.builtin.hostname:
+        name: "{{ prep_hostname }}"
+
+    - name: Ensure hostname entry exists in /etc/hosts
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: "^127\\.0\\.1\\.1\\s+"
+        line: "127.0.1.1 {{ prep_hostname }}"
+        create: true
+
+    - name: Clear shell history files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: >-
+        {{
+          [
+            server_prep_user_home + '/.bash_history',
+            server_prep_user_home + '/.zsh_history',
+            '/root/.bash_history',
+            '/root/.zsh_history'
+          ] | unique
+        }}
+
+    - name: Rotate journald logs
+      ansible.builtin.command: journalctl --rotate
+
+    - name: Vacuum old journal entries
+      ansible.builtin.command: journalctl --vacuum-time=1s
+
+    - name: Truncate log files under /var/log
+      ansible.builtin.shell: "find /var/log -type f -exec truncate -s 0 {} +"
+
+    - name: Clean temporary directories
+      ansible.builtin.file:
+        path: /var/tmp
+        state: absent
+
+    - name: Recreate /var/tmp directory
+      ansible.builtin.file:
+        path: /var/tmp
+        state: directory
+        owner: root
+        group: root
+        mode: "1777"
+
+    - name: Clean apt cache
+      ansible.builtin.command: apt-get clean
+
+    - name: Remove cloud-init symlinks and cache
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /run/cloud-init
+        - /var/cache/cloud
+
+    - name: Remove server prep symlink from user home
+      ansible.builtin.file:
+        path: "{{ server_prep_user_home }}/server-prep.sh"
+        state: absent
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg:
+          - "Server prep tasks complete."
+          - "Hostname set to {{ prep_hostname }} with static IP {{ prep_ip_address }}/{{ prep_prefix }}."
+          - "System will reboot after confirmation."
+
+    - name: Confirm before reboot
+      ansible.builtin.pause:
+        prompt: "Press Enter to reboot now (Ctrl+C to abort)"
+
+    - name: Reboot system
+      ansible.builtin.command: systemctl reboot
+      async: 0
+      poll: 0
+      ignore_errors: true

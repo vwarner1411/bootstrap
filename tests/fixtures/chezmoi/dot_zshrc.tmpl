@@ -1,0 +1,12 @@
+# Managed fixture to mirror dotfiles behavior
+{{- $profile := .bootstrap_profile | default "desktop" -}}
+# Fixture zshrc
+if command -v lsd >/dev/null 2>&1; then
+  alias ls="lsd"
+fi
+
+{{- if ne $profile "server" }}
+eval "$(starship init zsh)"
+{{- else }}
+# starship disabled on server profile
+{{- end }}

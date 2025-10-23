@@ -1,0 +1,1572 @@
+# Everything in this file only applies on Debian-family hosts
+
+- name: Update apt cache and install base packages
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    name:
+      - ncurses-term
+      - xz-utils
+      - bzip2
+      - tar
+      - curl
+      - ca-certificates
+      - build-essential
+      - python3-venv
+      - pipx
+      - unzip
+    state: present
+  when: ansible_facts.os_family == "Debian"
+
+# Server profile needs kitty terminfo even when the full client is skipped
+- name: Install kitty terminfo package when kitty binary is omitted
+  ansible.builtin.apt:
+    name: kitty-terminfo
+    state: present
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('kitty' in linux_cli_skip_tools)
+
+- name: Define GitHub download staging directory
+  ansible.builtin.set_fact:
+    linux_cli_download_dir: /tmp/zshell-github-downloads
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure GitHub download staging directory exists
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}"
+    state: directory
+    mode: "0755"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Normalize architecture strings for GitHub assets
+  ansible.builtin.set_fact:
+    arch_cpu: >-
+      {{ 'x86_64' if ansible_facts.architecture in ['x86_64', 'amd64']
+         else 'aarch64' if ansible_facts.architecture in ['aarch64', 'arm64']
+         else ansible_facts.architecture }}
+    arch_go: >-
+      {{ 'amd64' if ansible_facts.architecture in ['x86_64', 'amd64']
+         else 'arm64' if ansible_facts.architecture in ['aarch64', 'arm64']
+         else ansible_facts.architecture }}
+  when: ansible_facts.os_family == "Debian"
+
+# PowerShell ###################################################################
+- name: Check current PowerShell version
+  ansible.builtin.command: pwsh --version
+  register: powershell_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Compute existing PowerShell version string
+  ansible.builtin.set_fact:
+    powershell_version_pretty: >-
+      {{ (powershell_version_check.rc == 0) | ternary((powershell_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Fetch latest PowerShell release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/PowerShell/PowerShell/releases/latest
+    return_content: true
+  register: powershell_release
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Set PowerShell release facts
+  ansible.builtin.set_fact:
+    powershell_target_version: "{{ powershell_release.json.tag_name }}"
+    powershell_asset: >-
+      {{
+        (
+          powershell_release.json.assets
+          | selectattr('name', 'search', 'linux-x64\.tar\.gz$')
+          | map(attribute='browser_download_url')
+          | list
+          | first
+        )
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Download PowerShell release
+  ansible.builtin.get_url:
+    url: "{{ powershell_asset }}"
+    dest: /tmp/powershell.tar.gz
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+    - powershell_asset | length > 0
+    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
+
+- name: Create PowerShell installation directory
+  ansible.builtin.file:
+    path: /opt/microsoft/powershell
+    state: directory
+    mode: "0755"
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Extract PowerShell archive
+  ansible.builtin.unarchive:
+    src: /tmp/powershell.tar.gz
+    dest: /opt/microsoft/powershell
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+    - powershell_asset | length > 0
+    - powershell_version_check.stdout is not defined or powershell_target_version not in powershell_version_check.stdout
+
+- name: Ensure PowerShell binary is executable
+  ansible.builtin.file:
+    path: /opt/microsoft/powershell/pwsh
+    mode: "0755"
+    state: file
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Ensure PowerShell symlink exists
+  ansible.builtin.file:
+    src: /opt/microsoft/powershell/pwsh
+    dest: /usr/local/bin/pwsh
+    state: link
+    force: true
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Capture PowerShell version after install
+  ansible.builtin.command: pwsh --version
+  register: powershell_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Compute installed PowerShell version string
+  ansible.builtin.set_fact:
+    powershell_version_post_pretty: >-
+      {{ (powershell_version_post.rc == 0) | ternary((powershell_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+- name: Report installed PowerShell version
+  ansible.builtin.debug:
+    msg: "PowerShell version after install: {{ powershell_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
+
+# kitty ########################################################################
+- name: Check current kitty version
+  ansible.builtin.command: kitty --version
+  register: kitty_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Compute existing kitty version string
+  ansible.builtin.set_fact:
+    kitty_version_pretty: >-
+      {{ (kitty_version_check.rc == 0) | ternary((kitty_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Fetch latest kitty release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/kovidgoyal/kitty/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: kitty_release
+  retries: 3
+  delay: 2
+  until: kitty_release.status == 200
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Set kitty release facts
+  ansible.builtin.set_fact:
+    kitty_target_version: "{{ (kitty_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Set kitty asset URL
+  ansible.builtin.set_fact:
+    kitty_asset: >-
+      {{
+        (kitty_release.json.assets | default([]))
+        | selectattr('name', 'equalto', 'kitty-' ~ kitty_target_version ~ '-' ~ arch_cpu ~ '.txz')
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+- name: Determine if kitty install is required
+  ansible.builtin.set_fact:
+    kitty_install_required: >-
+      {{
+        (kitty_asset | length > 0) and
+        (
+          (kitty_version_check.rc | default(1)) != 0 or
+          (kitty_version_check.stdout is defined and kitty_target_version not in kitty_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Download kitty release
+  ansible.builtin.get_url:
+    url: "{{ kitty_asset }}"
+    dest: "{{ linux_cli_download_dir }}/kitty.txz"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+    - kitty_install_required
+
+- name: Remove existing kitty version directory
+  ansible.builtin.file:
+    path: "/opt/kitty-{{ kitty_target_version }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+    - kitty_install_required
+
+- name: Create kitty installation directory
+  ansible.builtin.file:
+    path: "/opt/kitty-{{ kitty_target_version }}"
+    state: directory
+    mode: "0755"
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Extract kitty release
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_download_dir }}/kitty.txz"
+    dest: "/opt/kitty-{{ kitty_target_version }}"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+    - kitty_install_required
+
+- name: Ensure kitty binary permissions
+  ansible.builtin.file:
+    path: "/opt/kitty-{{ kitty_target_version }}/bin/kitty"
+    state: file
+    mode: "0755"
+  when:
+    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+    - kitty_install_required
+
+- name: Update kitty current symlink
+  ansible.builtin.file:
+    src: "/opt/kitty-{{ kitty_target_version }}"
+    dest: /opt/kitty
+    state: link
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+    - kitty_install_required
+
+- name: Ensure kitty symlink exists
+  ansible.builtin.file:
+    src: /opt/kitty/bin/kitty
+    dest: /usr/local/bin/kitty
+    state: link
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+    - (kitty_version_check.rc | default(1)) == 0 or kitty_install_required
+
+- name: Clean kitty archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/kitty.txz"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+    - kitty_install_required
+
+- name: Capture kitty version after install
+  ansible.builtin.command: kitty --version
+  register: kitty_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Compute installed kitty version string
+  ansible.builtin.set_fact:
+    kitty_version_post_pretty: >-
+      {{ (kitty_version_post.rc == 0) | ternary((kitty_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Report installed kitty version
+  ansible.builtin.debug:
+    msg: "Kitty version after install: {{ kitty_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
+
+- name: Check current btop version
+  ansible.builtin.command: btop --version
+  register: btop_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute existing btop version string
+  ansible.builtin.set_fact:
+    btop_version_pretty: >-
+      {{ (btop_version_check.rc == 0) | ternary((btop_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest btop release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/aristocratos/btop/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: btop_release
+  retries: 3
+  delay: 2
+  until: btop_release.status == 200
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set btop release facts
+  ansible.builtin.set_fact:
+    btop_target_version: "{{ (btop_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine btop asset name
+  ansible.builtin.set_fact:
+    btop_asset_name: >-
+      {{ {'x86_64': 'btop-x86_64-linux-musl.tbz', 'aarch64': 'btop-aarch64-linux-musl.tbz'}.get(arch_cpu, '') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set btop asset URL
+  ansible.builtin.set_fact:
+    btop_asset: >-
+      {{
+        (btop_release.json.assets | default([]))
+        | selectattr('name', 'equalto', btop_asset_name | default(''))
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+- name: Determine if btop install is required
+  ansible.builtin.set_fact:
+    btop_install_required: >-
+      {{
+        (btop_asset | length > 0) and
+        (
+          (btop_version_check.rc | default(1)) != 0 or
+          (btop_version_check.stdout is defined and btop_target_version not in btop_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download btop release
+  ansible.builtin.get_url:
+    url: "{{ btop_asset }}"
+    dest: "{{ linux_cli_download_dir }}/btop.tbz"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_install_required
+
+- name: Remove previous btop build directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/btop"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_install_required
+
+- name: Unpack btop release
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_download_dir }}/btop.tbz"
+    dest: "{{ linux_cli_download_dir }}"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_install_required
+
+- name: Install btop
+  ansible.builtin.command:
+    cmd: make install PREFIX=/usr/local
+    chdir: "{{ linux_cli_download_dir }}/btop"
+  args:
+    creates: /usr/local/bin/btop
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_install_required
+
+- name: Remove btop build directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/btop"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_install_required
+
+- name: Clean btop archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/btop.tbz"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - btop_install_required
+
+- name: Capture btop version after install
+  ansible.builtin.command: btop --version
+  register: btop_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed btop version string
+  ansible.builtin.set_fact:
+    btop_version_post_pretty: >-
+      {{ (btop_version_post.rc == 0) | ternary((btop_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed btop version
+  ansible.builtin.debug:
+    msg: "Btop version after install: {{ btop_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check current lsd version
+  ansible.builtin.command: lsd --version
+  register: lsd_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute existing lsd version string
+  ansible.builtin.set_fact:
+    lsd_version_pretty: >-
+      {{ (lsd_version_check.rc == 0) | ternary((lsd_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest lsd release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/lsd-rs/lsd/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: lsd_release
+  retries: 3
+  delay: 2
+  until: lsd_release.status == 200
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set lsd release facts
+  ansible.builtin.set_fact:
+    lsd_target_version: "{{ (lsd_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Derive lsd architecture candidate list
+  ansible.builtin.set_fact:
+    lsd_arch_candidates: >-
+      {{
+        (
+          [arch_cpu]
+          + (
+              ['amd64']
+              if arch_cpu == 'x86_64'
+              else []
+            )
+          + (
+              ['x86_64']
+              if arch_cpu == 'amd64'
+              else []
+            )
+          + (
+              ['arm64']
+              if arch_cpu == 'aarch64'
+              else []
+            )
+          + (
+              ['aarch64']
+              if arch_cpu == 'arm64'
+              else []
+            )
+        )
+        | reject('equalto', '')
+        | list
+        | unique
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Build lsd asset candidate list
+  ansible.builtin.set_fact:
+    lsd_asset_candidates: >-
+      {{
+        (
+          lsd_arch_candidates
+          | map('regex_replace', '^', 'lsd-v' ~ lsd_target_version ~ '-')
+          | map('regex_replace', '$', '-unknown-linux-gnu.tar.gz')
+          | list
+        )
+        +
+        (
+          lsd_arch_candidates
+          | map('regex_replace', '^', 'lsd-v' ~ lsd_target_version ~ '-')
+          | map('regex_replace', '$', '-unknown-linux-musl.tar.gz')
+          | list
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set lsd asset URL
+  ansible.builtin.set_fact:
+    lsd_available_assets: "{{ lsd_release.json.assets | default([]) | map(attribute='name') | list }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Initialize lsd asset name
+  ansible.builtin.set_fact:
+    lsd_asset_name: ""
+  when: ansible_facts.os_family == "Debian"
+
+- name: Select lsd asset candidate
+  ansible.builtin.set_fact:
+    lsd_asset_name: "{{ item }}"
+  loop: "{{ lsd_asset_candidates }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (lsd_asset_name | default('')) == ""
+    - item in lsd_available_assets
+
+- name: Set lsd asset URL
+  ansible.builtin.set_fact:
+    lsd_asset: >-
+      {{
+        (lsd_release.json.assets | default([]))
+        | selectattr('name', 'equalto', lsd_asset_name)
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+- name: Fail if no lsd asset found
+  ansible.builtin.fail:
+    msg: "No matching lsd release asset found for arch {{ arch_cpu }} (version {{ lsd_target_version }})"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_asset | length == 0
+
+- name: Set lsd extraction directory
+  ansible.builtin.set_fact:
+    lsd_extract_dir: "{{ linux_cli_download_dir }}/{{ lsd_asset_name | regex_replace('\\.tar\\.gz$', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if lsd install is required
+  ansible.builtin.set_fact:
+    lsd_install_required: >-
+      {{
+        (lsd_asset | length > 0) and
+        (
+          (lsd_version_check.rc | default(1)) != 0 or
+          (lsd_version_check.stdout is defined and lsd_target_version not in lsd_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download lsd release
+  ansible.builtin.get_url:
+    url: "{{ lsd_asset }}"
+    dest: "{{ linux_cli_download_dir }}/lsd.tar.gz"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_install_required
+
+- name: Remove previous lsd build directory
+  ansible.builtin.file:
+    path: "{{ lsd_extract_dir }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_install_required
+
+- name: Unpack lsd release
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_download_dir }}/lsd.tar.gz"
+    dest: "{{ linux_cli_download_dir }}"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_install_required
+
+- name: Install lsd binary
+  ansible.builtin.copy:
+    src: "{{ lsd_extract_dir }}/lsd"
+    dest: /usr/local/bin/lsd
+    mode: "0755"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_install_required
+
+- name: Remove lsd build directory
+  ansible.builtin.file:
+    path: "{{ lsd_extract_dir }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_install_required
+
+- name: Clean lsd archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/lsd.tar.gz"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - lsd_install_required
+
+- name: Capture lsd version after install
+  ansible.builtin.command: lsd --version
+  register: lsd_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed lsd version string
+  ansible.builtin.set_fact:
+    lsd_version_post_pretty: >-
+      {{ (lsd_version_post.rc == 0) | ternary((lsd_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed lsd version
+  ansible.builtin.debug:
+    msg: "Lsd version after install: {{ lsd_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check current fzf version
+  ansible.builtin.command: fzf --version
+  register: fzf_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute existing fzf version string
+  ansible.builtin.set_fact:
+    fzf_version_pretty: >-
+      {{ (fzf_version_check.rc == 0) | ternary((fzf_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest fzf release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/junegunn/fzf/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: fzf_release
+  retries: 3
+  delay: 2
+  until: fzf_release.status == 200
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set fzf release facts
+  ansible.builtin.set_fact:
+    fzf_target_version: "{{ (fzf_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Build fzf asset candidate list
+  ansible.builtin.set_fact:
+    fzf_asset_candidates: >-
+      {{
+        [
+          ('fzf-' ~ fzf_target_version ~ '-linux_' ~ arch_go ~ '.tar.gz'),
+          ('fzf-' ~ fzf_target_version ~ '-linux_' ~ arch_cpu ~ '.tar.gz')
+        ]
+        | unique
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set fzf asset URL
+  ansible.builtin.set_fact:
+    fzf_available_assets: "{{ fzf_release.json.assets | default([]) | map(attribute='name') | list }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Initialize fzf asset name
+  ansible.builtin.set_fact:
+    fzf_asset_name: ""
+  when: ansible_facts.os_family == "Debian"
+
+- name: Select fzf asset candidate
+  ansible.builtin.set_fact:
+    fzf_asset_name: "{{ item }}"
+  loop: "{{ fzf_asset_candidates }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (fzf_asset_name | default('')) == ""
+    - item in fzf_available_assets
+
+- name: Set fzf asset URL
+  ansible.builtin.set_fact:
+    fzf_asset: >-
+      {{
+        (fzf_release.json.assets | default([]))
+        | selectattr('name', 'equalto', fzf_asset_name)
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fail if no fzf asset found
+  ansible.builtin.fail:
+    msg: "No matching fzf release asset found for arch {{ arch_cpu }} (version {{ fzf_target_version }})"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_asset | length == 0
+
+- name: Determine if fzf install is required
+  ansible.builtin.set_fact:
+    fzf_install_required: >-
+      {{
+        (fzf_asset | length > 0) and
+        (
+          (fzf_version_check.rc | default(1)) != 0 or
+          (fzf_version_check.stdout is defined and fzf_target_version not in fzf_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download fzf release
+  ansible.builtin.get_url:
+    url: "{{ fzf_asset }}"
+    dest: "{{ linux_cli_download_dir }}/fzf.tar.gz"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_install_required
+
+- name: Remove previous fzf build artifacts
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/fzf"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_install_required
+
+- name: Unpack fzf release
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_download_dir }}/fzf.tar.gz"
+    dest: "{{ linux_cli_download_dir }}"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_install_required
+
+- name: Install fzf binary
+  ansible.builtin.copy:
+    src: "{{ linux_cli_download_dir }}/fzf"
+    dest: /usr/local/bin/fzf
+    mode: "0755"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_install_required
+
+- name: Remove fzf build artifacts
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/fzf"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_install_required
+
+- name: Clean fzf archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/fzf.tar.gz"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fzf_install_required
+
+- name: Capture fzf version after install
+  ansible.builtin.command: fzf --version
+  register: fzf_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed fzf version string
+  ansible.builtin.set_fact:
+    fzf_version_post_pretty: >-
+      {{ (fzf_version_post.rc == 0) | ternary((fzf_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed fzf version
+  ansible.builtin.debug:
+    msg: "Fzf version after install: {{ fzf_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check current fastfetch version
+  ansible.builtin.command: fastfetch --version
+  register: fastfetch_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute existing fastfetch version string
+  ansible.builtin.set_fact:
+    fastfetch_version_pretty: >-
+      {{ (fastfetch_version_check.rc == 0) | ternary((fastfetch_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest fastfetch release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/fastfetch-cli/fastfetch/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: fastfetch_release
+  retries: 3
+  delay: 2
+  until: fastfetch_release.status == 200
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set fastfetch release facts
+  ansible.builtin.set_fact:
+    fastfetch_target_version: "{{ (fastfetch_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+    fastfetch_arch_tokens: >-
+      {{
+        [
+          (arch_cpu == 'x86_64') | ternary('amd64', ''),
+          (arch_cpu == 'aarch64') | ternary('aarch64', ''),
+          arch_go,
+          arch_cpu
+        ]
+        | reject('equalto', '')
+        | unique
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Build fastfetch asset candidate list
+  ansible.builtin.set_fact:
+    fastfetch_asset_candidates: >-
+      {{
+        (
+          (
+            fastfetch_arch_tokens
+            | map('regex_replace', '^', 'fastfetch-linux-')
+            | map('regex_replace', '$', '.tar.gz')
+            | list
+          )
+          +
+          (
+            fastfetch_arch_tokens
+            | map('regex_replace', '^', 'fastfetch-linux-')
+            | map('regex_replace', '$', '-polyfilled.tar.gz')
+            | list
+          )
+          +
+          (
+            (arch_cpu == 'x86_64') | ternary(['fastfetch-musl-amd64.tar.gz'], [])
+          )
+        ) | unique
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set fastfetch asset list
+  ansible.builtin.set_fact:
+    fastfetch_available_assets: "{{ fastfetch_release.json.assets | default([]) | map(attribute='name') | list }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Initialize fastfetch asset name
+  ansible.builtin.set_fact:
+    fastfetch_asset_name: ""
+  when: ansible_facts.os_family == "Debian"
+
+- name: Select fastfetch asset candidate
+  ansible.builtin.set_fact:
+    fastfetch_asset_name: "{{ item }}"
+  loop: "{{ fastfetch_asset_candidates }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (fastfetch_asset_name | default('')) == ""
+    - item in fastfetch_available_assets
+
+- name: Set fastfetch asset URL
+  ansible.builtin.set_fact:
+    fastfetch_asset: >-
+      {{
+        (fastfetch_release.json.assets | default([]))
+        | selectattr('name', 'equalto', fastfetch_asset_name)
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fail if no fastfetch asset found
+  ansible.builtin.fail:
+    msg: "No matching fastfetch release asset found for arch {{ arch_cpu }} (version {{ fastfetch_target_version }})"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fastfetch_asset | length == 0
+
+- name: Derive fastfetch extraction directory
+  ansible.builtin.set_fact:
+    fastfetch_extract_dir: "{{ linux_cli_download_dir }}/{{ fastfetch_asset_name | regex_replace('\\.tar\\.gz$', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if fastfetch install is required
+  ansible.builtin.set_fact:
+    fastfetch_install_required: >-
+      {{
+        (fastfetch_asset | length > 0) and
+        (
+          (fastfetch_version_check.rc | default(1)) != 0 or
+          (fastfetch_version_check.stdout is defined and fastfetch_target_version not in fastfetch_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download fastfetch release
+  ansible.builtin.get_url:
+    url: "{{ fastfetch_asset }}"
+    dest: "{{ linux_cli_download_dir }}/fastfetch.tar.gz"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fastfetch_install_required
+
+- name: Remove previous fastfetch build directory
+  ansible.builtin.file:
+    path: "{{ fastfetch_extract_dir }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fastfetch_install_required
+
+- name: Unpack fastfetch release
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_download_dir }}/fastfetch.tar.gz"
+    dest: "{{ linux_cli_download_dir }}"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fastfetch_install_required
+
+- name: Install fastfetch binary
+  ansible.builtin.copy:
+    src: "{{ fastfetch_extract_dir }}/usr/bin/fastfetch"
+    dest: /usr/local/bin/fastfetch
+    mode: "0755"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fastfetch_install_required
+
+- name: Remove fastfetch build directory
+  ansible.builtin.file:
+    path: "{{ fastfetch_extract_dir }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fastfetch_install_required
+
+- name: Clean fastfetch archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/fastfetch.tar.gz"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - fastfetch_install_required
+
+- name: Capture fastfetch version after install
+  ansible.builtin.command: fastfetch --version
+  register: fastfetch_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed fastfetch version string
+  ansible.builtin.set_fact:
+    fastfetch_version_post_pretty: >-
+      {{ (fastfetch_version_post.rc == 0) | ternary((fastfetch_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed fastfetch version
+  ansible.builtin.debug:
+    msg: "Fastfetch version after install: {{ fastfetch_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install fastfetch MOTD configuration
+  ansible.builtin.copy:
+    dest: /etc/update-motd.d/fastfetch.jsonc
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {
+        "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/master/doc/json_schema.json",
+        "logo": {
+          "type": "none"
+        },
+        "modules": [
+          "os",
+          "kernel",
+          "uptime",
+          "packages",
+          "separator",
+          "cpu",
+          {
+            "type": "CPUUsage",
+            "separate": true
+          },
+          {
+            "type": "loadavg",
+            "compact": false,
+            "key": " {duration>2}m"
+          },
+          "separator",
+          "memory",
+          "swap",
+          "separator",
+          "disk",
+          "separator",
+          "localip"
+        ]
+      }
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+
+- name: Install fastfetch MOTD script
+  ansible.builtin.copy:
+    dest: /etc/update-motd.d/00-fastfetch-motd
+    mode: "0755"
+    owner: root
+    group: root
+    content: |
+      #!/bin/sh
+      FASTFETCH_CFG="/etc/update-motd.d/fastfetch.jsonc"
+      if command -v fastfetch >/dev/null 2>&1; then
+        if [ -r "$FASTFETCH_CFG" ]; then
+          fastfetch --config "$FASTFETCH_CFG" 2>/dev/null || fastfetch 2>/dev/null
+        else
+          fastfetch 2>/dev/null
+        fi
+      fi
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+
+- name: Discover existing MOTD scripts
+  ansible.builtin.find:
+    paths: /etc/update-motd.d
+    file_type: any
+  register: motd_scripts
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+
+- name: Disable default MOTD scripts
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "0644"
+    follow: true
+  loop: "{{ motd_scripts.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - profile == "server"
+    - item.path != '/etc/update-motd.d/00-fastfetch-motd'
+
+- name: Check current starship version
+  ansible.builtin.command: starship --version
+  register: starship_version_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Compute existing starship version string
+  ansible.builtin.set_fact:
+    starship_version_pretty: >-
+      {{ (starship_version_check.rc == 0) | ternary((starship_version_check.stdout | default('') | trim), 'not installed') }}
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Fetch latest starship release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/starship/starship/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: starship_release
+  retries: 3
+  delay: 2
+  until: starship_release.status == 200
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Set starship release facts
+  ansible.builtin.set_fact:
+    starship_target_version: "{{ (starship_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Build starship asset candidate list
+  ansible.builtin.set_fact:
+    starship_asset_candidates: >-
+      {{
+        (
+          [arch_cpu, arch_go]
+          | reject('equalto', '')
+          | list
+          | unique
+          | map('regex_replace', '^', 'starship-')
+          | map('regex_replace', '$', '-unknown-linux-gnu.tar.gz')
+          | list
+        )
+        +
+        (
+          [arch_cpu, arch_go]
+          | reject('equalto', '')
+          | list
+          | unique
+          | map('regex_replace', '^', 'starship-')
+          | map('regex_replace', '$', '-unknown-linux-musl.tar.gz')
+          | list
+        )
+      }}
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Set starship asset URL
+  ansible.builtin.set_fact:
+    starship_available_assets: "{{ starship_release.json.assets | default([]) | map(attribute='name') | list }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Initialize starship asset name
+  ansible.builtin.set_fact:
+    starship_asset_name: ""
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Select starship asset candidate
+  ansible.builtin.set_fact:
+    starship_asset_name: "{{ item }}"
+  loop: "{{ starship_asset_candidates }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - (starship_asset_name | default('')) == ""
+    - item in starship_available_assets
+
+- name: Set starship asset URL
+  ansible.builtin.set_fact:
+    starship_asset: >-
+      {{
+        (starship_release.json.assets | default([]))
+        | selectattr('name', 'equalto', starship_asset_name)
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+- name: Fail if no starship asset found
+  ansible.builtin.fail:
+    msg: "No matching starship release asset found for arch {{ arch_cpu }} (version {{ starship_target_version }})"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - starship_asset | length == 0
+
+- name: Determine if starship install is required
+  ansible.builtin.set_fact:
+    starship_install_required: >-
+      {{
+        (starship_asset | length > 0) and
+        (
+          (starship_version_check.rc | default(1)) != 0 or
+          (starship_version_check.stdout is defined and starship_target_version not in starship_version_check.stdout)
+        )
+      }}
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Download starship release
+  ansible.builtin.get_url:
+    url: "{{ starship_asset }}"
+    dest: "{{ linux_cli_download_dir }}/starship.tar.gz"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - starship_install_required
+
+- name: Remove previous starship build directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/starship"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - starship_install_required
+
+- name: Unpack starship release
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_download_dir }}/starship.tar.gz"
+    dest: "{{ linux_cli_download_dir }}"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - starship_install_required
+
+- name: Install starship binary
+  ansible.builtin.copy:
+    src: "{{ linux_cli_download_dir }}/starship"
+    dest: /usr/local/bin/starship
+    mode: "0755"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - starship_install_required
+
+- name: Remove starship build artifacts
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/starship"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - starship_install_required
+
+- name: Clean starship archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/starship.tar.gz"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+    - starship_install_required
+
+- name: Capture starship version after install
+  ansible.builtin.command: starship --version
+  register: starship_version_post
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Compute installed starship version string
+  ansible.builtin.set_fact:
+    starship_version_post_pretty: >-
+      {{ (starship_version_post.rc == 0) | ternary((starship_version_post.stdout | default('') | trim), 'not installed') }}
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Report installed starship version
+  ansible.builtin.debug:
+    msg: "Starship version after install: {{ starship_version_post_pretty }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('starship' not in linux_cli_skip_tools)
+
+- name: Check current yazi version
+  ansible.builtin.command: yazi --version
+  register: yazi_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute existing yazi version string
+  ansible.builtin.set_fact:
+    yazi_version_pretty: >-
+      {{ (yazi_version_check.rc == 0) | ternary((yazi_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest yazi release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/sxyazi/yazi/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: yazi_release
+  retries: 3
+  delay: 2
+  until: yazi_release.status == 200
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set yazi release facts
+  ansible.builtin.set_fact:
+    yazi_target_version: "{{ (yazi_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Build yazi asset candidate list
+  ansible.builtin.set_fact:
+    yazi_asset_candidates: >-
+      {{
+        (
+          [arch_cpu, arch_go]
+          | reject('equalto', '')
+          | list
+          | unique
+          | map('regex_replace', '^', 'yazi-')
+          | map('regex_replace', '$', '-unknown-linux-gnu.zip')
+          | list
+        )
+        +
+        (
+          [arch_cpu, arch_go]
+          | reject('equalto', '')
+          | list
+          | unique
+          | map('regex_replace', '^', 'yazi-')
+          | map('regex_replace', '$', '-unknown-linux-musl.zip')
+          | list
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set yazi available assets
+  ansible.builtin.set_fact:
+    yazi_available_assets: "{{ yazi_release.json.assets | default([]) | map(attribute='name') | list }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Initialize yazi asset name
+  ansible.builtin.set_fact:
+    yazi_asset_name: ""
+  when: ansible_facts.os_family == "Debian"
+
+- name: Select yazi asset candidate
+  ansible.builtin.set_fact:
+    yazi_asset_name: "{{ item }}"
+  loop: "{{ yazi_asset_candidates }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (yazi_asset_name | default('')) == ""
+    - item in yazi_available_assets
+
+- name: Set yazi asset URL
+  ansible.builtin.set_fact:
+    yazi_asset: >-
+      {{
+        (yazi_release.json.assets | default([]))
+        | selectattr('name', 'equalto', yazi_asset_name)
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure unzip is available
+  ansible.builtin.package:
+    name: unzip
+    state: present
+  when: ansible_facts.os_family == "Debian"
+- name: Fail if no yazi asset found
+  ansible.builtin.fail:
+    msg: "No matching yazi release asset found for arch {{ arch_cpu }} (version {{ yazi_target_version }})"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_asset | length == 0
+
+- name: Set yazi extraction directory
+  ansible.builtin.set_fact:
+    yazi_extract_dir: "{{ linux_cli_download_dir }}/yazi_extract/{{ yazi_asset_name | regex_replace('\\.zip$', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Determine if yazi install is required
+  ansible.builtin.set_fact:
+    yazi_install_required: >-
+      {{
+        (yazi_asset | length > 0) and
+        (
+          (yazi_version_check.rc | default(1)) != 0 or
+          (yazi_version_check.stdout is defined and yazi_target_version not in yazi_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download yazi release
+  ansible.builtin.get_url:
+    url: "{{ yazi_asset }}"
+    dest: "{{ linux_cli_download_dir }}/yazi.zip"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Remove previous yazi extract directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/yazi_extract"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Ensure yazi extract directory exists
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/yazi_extract"
+    state: directory
+    mode: "0755"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Extract yazi release
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_download_dir }}/yazi.zip"
+    dest: "{{ linux_cli_download_dir }}/yazi_extract"
+    remote_src: true
+    creates: "{{ yazi_extract_dir }}/yazi"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Install yazi binary
+  ansible.builtin.copy:
+    src: "{{ yazi_extract_dir }}/yazi"
+    dest: /usr/local/bin/yazi
+    mode: "0755"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Clean yazi archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/yazi.zip"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Remove yazi extract directory
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/yazi_extract"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - yazi_install_required
+
+- name: Capture yazi version after install
+  ansible.builtin.command: yazi --version
+  register: yazi_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed yazi version string
+  ansible.builtin.set_fact:
+    yazi_version_post_pretty: >-
+      {{ (yazi_version_post.rc == 0) | ternary((yazi_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed yazi version
+  ansible.builtin.debug:
+    msg: "Yazi version after install: {{ yazi_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check current yt-dlp version
+  ansible.builtin.command: yt-dlp --version
+  register: ytdlp_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+
+- name: Compute existing yt-dlp version string
+  ansible.builtin.set_fact:
+    ytdlp_version_pretty: >-
+      {{ (ytdlp_version_check.rc == 0) | ternary((ytdlp_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+
+- name: Fetch latest yt-dlp release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: zshell-ansible
+  register: ytdlp_release
+  retries: 3
+  delay: 2
+  until: ytdlp_release.status == 200
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+
+- name: Set yt-dlp release facts
+  ansible.builtin.set_fact:
+    ytdlp_target_version: "{{ (ytdlp_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+
+- name: Set yt-dlp asset URL
+  ansible.builtin.set_fact:
+    ytdlp_asset: >-
+      {{
+        (ytdlp_release.json.assets | default([]))
+        | selectattr('name', 'equalto', 'yt-dlp')
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+- name: Determine if yt-dlp install is required
+  ansible.builtin.set_fact:
+    ytdlp_install_required: >-
+      {{
+        (ytdlp_asset | length > 0) and
+        (
+          (ytdlp_version_check.rc | default(1)) != 0 or
+          (ytdlp_version_check.stdout is defined and ytdlp_target_version not in ytdlp_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+
+- name: Download yt-dlp release
+  ansible.builtin.get_url:
+    url: "{{ ytdlp_asset }}"
+    dest: /usr/local/bin/yt-dlp
+    mode: "0755"
+  when:
+    - ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+    - ytdlp_install_required
+
+- name: Capture yt-dlp version after install
+  ansible.builtin.command: yt-dlp --version
+  register: ytdlp_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+
+- name: Compute installed yt-dlp version string
+  ansible.builtin.set_fact:
+    ytdlp_version_post_pretty: >-
+      {{ (ytdlp_version_post.rc == 0) | ternary((ytdlp_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+- name: Report installed yt-dlp version
+  ansible.builtin.debug:
+    msg: "yt-dlp version after install: {{ ytdlp_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools

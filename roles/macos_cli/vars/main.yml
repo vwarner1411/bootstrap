@@ -1,0 +1,26 @@
+macos_cli_brew_packages:
+  - curl
+  - git
+  - jq
+  - lynx
+  - ncdu
+  - neovim
+  - python
+  - rsync
+  - tree
+  - wget
+  - zsh
+  - coreutils
+  - btop
+  - kitty
+  - starship
+  - lsd
+  - yazi
+  - fzf
+  - fastfetch
+  - yt-dlp
+  - ansible
+  - powershell
+
+macos_cli_cask_packages:
+  - iterm2

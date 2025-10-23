@@ -1,94 +1,110 @@
-# Zsh Configuration
+# Bootstrap Environment
 
-This repository contains Valerie's personal `.zshrc` file.  
-It customizes the Z shell (zsh) environment with useful plugins, aliases, and tools to improve productivity on macOS and Linux.
+Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu today, Debian/Omarchy next). The repo delivers:
 
----
+- A single `curl` entrypoint that installs prerequisites, syncs `chezmoi` dotfiles, and applies Ansible roles.
+- Ansible playbooks/roles for idempotent package management without Homebrew on Linux.
+- Tests to guard syntax, linting, and shell quality.
 
-## Features
+## Quick Start
 
-### Core Setup
-- **Coreutils first**: Replaces default macOS utilities with GNU Coreutils via Homebrew.
-- **History**: Expands history to 10,000 entries and ensures history is always saved.
-- **Extended globbing**: Enables advanced globbing patterns (`setopt extended_glob`).
+Interactive shells (TTY) will prompt for sudo when needed.
 
-### Plugins & Enhancements
-- **zsh-completions**: Adds extended completions for many commands.
-- **zsh-syntax-highlighting**: Highlights commands as you type.
-- **zsh-autosuggestions**: Suggests commands from history.
-- **zmv**: Autoloads the powerful `zmv` function for batch renaming.
+```bash
+curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh | bash
+```
 
-### Oh My Zsh
-- Uses [Oh My Zsh](https://ohmyz.sh/) as a plugin manager.
-- Theme: `dracula-pro`.
-- Plugins enabled:
-  - `git`
-  - `autoupdate`
-  - `jsontools`
+Environment variables:
 
-### Aliases
-- **Python**: Defaults `python` → `python3`, `pip` → `pip3`.
-- **Editor**: `vim` and `vi` point to Neovim with a custom config.
-- **Mosh**: Runs mosh with firewall allowance.
-- **Homebrew maintenance**: `brewski` updates, upgrades, cleans, and checks for issues.
-- **Process kill**: `killadobe` terminates all Adobe processes.
-- **YouTube downloads**: Aliases for `yt-dlp` with aria2c for fast parallel downloads.
-- **sudo TouchID**: `touchsudo` enables macOS TouchID for `sudo`.
-- **Directory listing**: Aliases `ls`, `l`, and `ll` to [lsd](https://github.com/lsd-rs/lsd).
-- **Misc**:
-  - `powershell` → `pwsh`
-  - `rsync` → Homebrew-installed `rsync`
+- `PROFILE=server|desktop` (default `desktop`)
+- `REPO_BRANCH` (defaults to `main`)
+- `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
 
----
+The `server` profile skips desktop niceties (`powershell`, `kitty`, `starship`, `yt-dlp`) while still installing the core CLI stack.
 
-## Requirements
+Example one-liners:
 
-To use this `.zshrc` effectively, install the following:
+```bash
+# Desktop workstation
+PROFILE=desktop CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh)"
 
-- [zsh](https://www.zsh.org/)
-- [Oh My Zsh](https://ohmyz.sh/)
-- [Homebrew](https://brew.sh/)
-- [coreutils](https://formulae.brew.sh/formula/coreutils)
-- [zsh-syntax-highlighting](https://formulae.brew.sh/formula/zsh-syntax-highlighting)
-- [zsh-autosuggestions](https://formulae.brew.sh/formula/zsh-autosuggestions)
-- [lsd](https://github.com/lsd-rs/lsd)
-- [neovim](https://neovim.io/)
-- [mosh](https://mosh.org/)
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-- [aria2](https://aria2.github.io/)
-- [powershell](https://formulae.brew.sh/cask/powershell)
+# Server baseline
+PROFILE=server CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh)"
+```
 
----
+Re-run the same command any time to upgrade packages and reapply dotfiles.
 
-## Installation
+## Server Prep Script
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/vwarner1411/zshell.git
-   ```
+When the server profile is bootstrapped, a helper script `~/server-prep.sh` is staged (with the playbook stored under `~/.local/share/zshell/server_prep/`). Run it manually to harden a VM before turning it into a template—it prompts for hostname and static networking, disables cloud-init, refreshes SSH host keys, applies the requested sysctl values, scrubs logs/history, and reboots when finished.
 
-2. Backup your existing `.zshrc`:
-   ```bash
-   mv ~/.zshrc ~/.zshrc.backup
-   ```
+## What Gets Installed
 
-3. Symlink this repo’s `.zshrc`:
-   ```bash
-   ln -s ~/path/to/repo/.zshrc ~/.zshrc
-   ```
+| Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
+|---------------------|-----------------------------------------------|-------------------------------------------------------------------|
+| Core CLI            | git, curl, wget, rsync, jq, ncdu, tree, lynx  | Same set using `apt`, plus python3/pip, build-essential, sysstat  |
+| Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autocomplete, syntax-highlighting) |
+| Prompt/UX           | starship, fastfetch, lsd, yazi, fzf, btop, kitty | Latest GitHub releases for starship, fastfetch, lsd, yazi, fzf, btop, kitty |
+| Development         | neovim, ansible, Powershell, yt-dlp           | Latest GitHub releases for Ansible CLI, PowerShell, yt-dlp        |
+| Dotfiles            | Managed via `chezmoi init --apply`            | Same dotfiles source                                              |
 
-4. Reload your shell:
-   ```bash
-   source ~/.zshrc
-   ```
+Linux nodes never rely on Homebrew; developer tooling comes straight from GitHub releases (apt is only used for core OS/build dependencies).
 
----
+## Project Layout
 
-## Notes
-- Make sure you have the [Dracula Pro theme](https://draculatheme.com/pro) for Oh My Zsh, or adjust the theme in the `.zshrc`.
-- Some aliases (like `mosh` and `touchsudo`) are tailored for Valerie’s environment and may need editing for yours.
+```
+├── ansible.cfg
+├── inventory/hosts.yml
+├── playbooks/bootstrap.yml
+├── requirements.yml
+├── roles/
+│   ├── common_core/        # shared baseline
+│   ├── linux_cli/          # GitHub releases + minimal apt build deps
+│   ├── macos_cli/          # Homebrew formulas/casks
+│   ├── shell_extras/       # oh-my-zsh and plugins
+│   └── desktop_tools/      # desktop-only extras
+├── scripts/bootstrap.sh    # curl-able entrypoint
+└── tests/smoke.sh          # syntax/lint/shellcheck
+```
 
----
+## Running Manually
+
+```bash
+# assumes repo cloned to ~/src/zshell
+cd ~/src/zshell
+ansible-galaxy collection install -r requirements.yml --force
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop" --ask-become-pass
+```
+
+Switch to server profile:
+
+```bash
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server" --ask-become-pass
+```
+
+## Tests
+
+Use the smoke script to validate changes before committing:
+
+```bash
+./tests/smoke.sh
+```
+
+- `ansible-playbook --syntax-check`
+- `ansible-lint` (if present)
+- `shellcheck` for the bootstrap script
+
+Add Molecule or CI workflows later without changing the bootstrap flow.
+
+## Roadmap
+
+- Debian + Arch inventory groups
+- Additional Molecule scenarios
+- Optional GUI packages gated by tags
+- Cached release lookup for air-gapped installs
 
 ## License
-MIT – feel free to reuse and adapt.
+
+MIT – reuse and adapt as needed. Pull requests welcome.

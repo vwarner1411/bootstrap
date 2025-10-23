@@ -1,0 +1,47 @@
+- name: Install desktop packages on Debian
+  ansible.builtin.apt:
+    name:
+      - jq
+      - fonts-firacode
+    state: present
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check kitty desktop entry availability
+  ansible.builtin.stat:
+    path: /opt/kitty/share/applications/kitty.desktop
+  register: kitty_desktop_entry
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure kitty desktop entry symlink exists
+  ansible.builtin.file:
+    src: /opt/kitty/share/applications/kitty.desktop
+    dest: /usr/share/applications/kitty.desktop
+    state: link
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - kitty_desktop_entry.stat.exists
+    - (ansible_facts.get('distribution_major_version', '0') | int) >= 24
+
+- name: Check for oh-my-zsh custom directory
+  ansible.builtin.stat:
+    path: "{{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom"
+  register: ohmyzsh_custom_dir
+  become: false
+
+- name: Check for starship binary
+  ansible.builtin.command: starship --version
+  register: starship_cli_check
+  changed_when: false
+  failed_when: false
+  become: false
+  when: ohmyzsh_custom_dir.stat.exists
+
+- name: Install Starship completions
+  ansible.builtin.shell: "starship completions zsh > {{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom/starship.zsh"
+  args:
+    creates: "{{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom/starship.zsh"
+  become: false
+  when:
+    - ohmyzsh_custom_dir.stat.exists
+    - starship_cli_check.rc == 0
