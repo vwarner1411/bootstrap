@@ -456,9 +456,9 @@ main() {
   ensure_chezmoi
   configure_chezmoi_profile
   clone_repo
-  run_chezmoi
   install_collections
   run_playbook
+  run_chezmoi
   stage_server_prep_assets
   log "Bootstrap completed successfully"
 }
