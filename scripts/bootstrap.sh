@@ -368,7 +368,7 @@ run_chezmoi() {
   chez_cmd+="   else"
   chez_cmd+="     chezmoi git -- reset --hard >/dev/null 2>&1 || true;"
   chez_cmd+="   fi;"
-  chez_cmd+="   if ! chezmoi update --apply; then"
+  chez_cmd+="   if ! chezmoi update --apply --force; then"
   chez_cmd+="     echo '[chezmoi] update failed; attempting direct apply' >&2;"
   chez_cmd+="     chezmoi apply --force;"
   chez_cmd+="   fi;"
