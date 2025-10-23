@@ -1048,17 +1048,20 @@
       #!/bin/sh
       FASTFETCH_CFG="/etc/update-motd.d/fastfetch.jsonc"
       USER_NAME="${PAM_USER:-${LOGNAME:-$(id -un 2>/dev/null)}}"
-      EXEC_CMD="fastfetch"
+      FASTFETCH_ARGS=""
       if [ -r "$FASTFETCH_CFG" ]; then
-        EXEC_CMD="fastfetch --config \"$FASTFETCH_CFG\""
+        FASTFETCH_ARGS="--config \"$FASTFETCH_CFG\""
       fi
       if command -v fastfetch >/dev/null 2>&1; then
-        if command -v runuser >/dev/null 2>&1 && [ -n "$USER_NAME" ]; then
-          runuser -u "$USER_NAME" -- sh -c "$EXEC_CMD" 2>/dev/null || runuser -u "$USER_NAME" -- fastfetch 2>/dev/null
-        elif command -v sudo >/dev/null 2>&1 && [ -n "$USER_NAME" ]; then
-          sudo -u "$USER_NAME" -- sh -c "$EXEC_CMD" 2>/dev/null || sudo -u "$USER_NAME" -- fastfetch 2>/dev/null
+        USER_ENTRY="$(getent passwd "$USER_NAME" 2>/dev/null || true)"
+        USER_SHELL="$(printf '%s' "$USER_ENTRY" | cut -d: -f7)"
+        USER_HOME="$(printf '%s' "$USER_ENTRY" | cut -d: -f6)"
+        [ -n "$USER_SHELL" ] || USER_SHELL="/bin/sh"
+        [ -n "$USER_HOME" ] || USER_HOME="/home/$USER_NAME"
+        if command -v runuser >/dev/null 2>&1 && [ -n "$USER_NAME" ] && [ "$USER_NAME" != "root" ]; then
+          runuser -u "$USER_NAME" -- env SHELL="$USER_SHELL" HOME="$USER_HOME" sh -c "fastfetch $FASTFETCH_ARGS" 2>/dev/null || runuser -u "$USER_NAME" -- env SHELL="$USER_SHELL" HOME="$USER_HOME" fastfetch 2>/dev/null
         else
-          sh -c "$EXEC_CMD" 2>/dev/null || fastfetch 2>/dev/null
+          env SHELL="$USER_SHELL" HOME="$USER_HOME" sh -c "fastfetch $FASTFETCH_ARGS" 2>/dev/null || fastfetch 2>/dev/null
         fi
       fi
   when:
