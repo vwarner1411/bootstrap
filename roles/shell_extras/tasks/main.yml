@@ -35,6 +35,7 @@
     dest: "{{ shell_extras_oh_my_zsh_dir }}"
     version: master
     update: true
+    force: true
   become: false
   register: ohmyzsh_clone
 
