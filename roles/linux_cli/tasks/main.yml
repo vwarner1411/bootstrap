@@ -1049,7 +1049,7 @@
       FASTFETCH_CFG="/etc/update-motd.d/fastfetch.jsonc"
       if command -v fastfetch >/dev/null 2>&1; then
         if [ -r "$FASTFETCH_CFG" ]; then
-          fastfetch --load-config "$FASTFETCH_CFG" 2>/dev/null || fastfetch 2>/dev/null
+          fastfetch --config "$FASTFETCH_CFG" 2>/dev/null || fastfetch 2>/dev/null
         else
           fastfetch 2>/dev/null
         fi
