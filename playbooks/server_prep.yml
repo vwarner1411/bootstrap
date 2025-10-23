@@ -235,16 +235,17 @@
 
     - name: Display completion message
       ansible.builtin.debug:
-        msg: |
-          Server prep tasks complete.
-          Hostname set to {{ prep_hostname }} with static IP {{ prep_ip_address }}/{{ prep_prefix }}.
-          System will reboot after confirmation.
+        msg:
+          - "Server prep tasks complete."
+          - "Hostname set to {{ prep_hostname }} with static IP {{ prep_ip_address }}/{{ prep_prefix }}."
+          - "System will reboot after confirmation."
 
     - name: Confirm before reboot
       ansible.builtin.pause:
         prompt: "Press Enter to reboot now (Ctrl+C to abort)"
 
     - name: Reboot system
-      ansible.builtin.reboot:
-        msg: "Rebooting after server prep"
-        reboot_timeout: 600
+      ansible.builtin.command: systemctl reboot
+      async: 0
+      poll: 0
+      ignore_errors: true
