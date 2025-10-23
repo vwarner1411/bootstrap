@@ -11,7 +11,7 @@ Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu toda
 Interactive shells (TTY) will prompt for sudo when needed.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vwarner1411/bootstrap/main/scripts/bootstrap.sh | bash
 ```
 
 Environment variables:
@@ -27,18 +27,18 @@ Example one-liners:
 ```bash
 # Desktop workstation
 PROFILE=desktop CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh)"
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/bootstrap/main/scripts/bootstrap.sh)"
 
 # Server baseline
 PROFILE=server CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/zshell/main/scripts/bootstrap.sh)"
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/bootstrap/main/scripts/bootstrap.sh)"
 ```
 
 Re-run the same command any time to upgrade packages and reapply dotfiles.
 
 ## Server Prep Script
 
-When the server profile is bootstrapped, a helper script `~/server-prep.sh` is staged (with the playbook stored under `~/.local/share/zshell/server_prep/`). Run it manually to harden a VM before turning it into a template—it prompts for hostname and static networking, disables cloud-init, refreshes SSH host keys, applies the requested sysctl values, scrubs logs/history, and reboots when finished.
+When the server profile is bootstrapped, a helper script `~/server-prep.sh` is staged (with the playbook stored under `~/.local/share/bootstrap/server_prep/`). Run it manually to harden a VM before turning it into a template—it prompts for hostname and static networking, disables cloud-init, refreshes SSH host keys, applies the requested sysctl values, scrubs logs/history, and reboots when finished.
 
 ## What Gets Installed
 
@@ -72,8 +72,8 @@ Linux nodes never rely on Homebrew; developer tooling comes straight from GitHub
 ## Running Manually
 
 ```bash
-# assumes repo cloned to ~/src/zshell
-cd ~/src/zshell
+# assumes repo cloned to ~/src/bootstrap
+cd ~/src/bootstrap
 ansible-galaxy collection install -r requirements.yml --force
 ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop" --ask-become-pass
 ```

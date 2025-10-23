@@ -44,7 +44,7 @@ import urllib.request
 url = "https://api.github.com/repos/PowerShell/PowerShell/releases/latest"
 headers = {
     "Accept": "application/vnd.github+json",
-    "User-Agent": "zshell-smoke"
+    "User-Agent": "bootstrap-smoke"
 }
 token = os.getenv("GITHUB_TOKEN")
 if token:

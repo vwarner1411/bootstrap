@@ -29,7 +29,7 @@
 
 - name: Define GitHub download staging directory
   ansible.builtin.set_fact:
-    linux_cli_download_dir: /tmp/zshell-github-downloads
+    linux_cli_download_dir: /tmp/bootstrap-github-downloads
   when: ansible_facts.os_family == "Debian"
 
 - name: Ensure GitHub download staging directory exists
@@ -168,7 +168,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: kitty_release
   retries: 3
   delay: 2
@@ -311,7 +311,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: btop_release
   retries: 3
   delay: 2
@@ -442,7 +442,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: lsd_release
   retries: 3
   delay: 2
@@ -653,7 +653,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: fzf_release
   retries: 3
   delay: 2
@@ -819,7 +819,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: fastfetch_release
   retries: 3
   delay: 2
@@ -1102,7 +1102,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: starship_release
   retries: 3
   delay: 2
@@ -1309,7 +1309,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: yazi_release
   retries: 3
   delay: 2
@@ -1509,7 +1509,7 @@
     return_content: true
     headers:
       Accept: application/vnd.github+json
-      User-Agent: zshell-ansible
+      User-Agent: bootstrap-ansible
   register: ytdlp_release
   retries: 3
   delay: 2

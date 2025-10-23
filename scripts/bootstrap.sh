@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/vwarner1411/zshell.git}"
+REPO_URL="${REPO_URL:-https://github.com/vwarner1411/bootstrap.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 CHEZMOI_REPO="${CHEZMOI_REPO:-https://github.com/vwarner1411/dotfiles.git}"
-WORKDIR="${WORKDIR:-$HOME/.local/share/zshell}"
+WORKDIR="${WORKDIR:-$HOME/.local/share/bootstrap}"
 PROFILE="${PROFILE:-desktop}"
 
 TARGET_USER="${TARGET_USER_OVERRIDE:-}"
@@ -133,7 +133,7 @@ repo = sys.argv[1]
 url = f"https://api.github.com/repos/{repo}/releases/latest"
 req = urllib.request.Request(url, headers={
     "Accept": "application/vnd.github+json",
-    "User-Agent": "zshell-bootstrap"
+    "User-Agent": "bootstrap-installer"
 })
 with urllib.request.urlopen(req) as resp:
     data = json.load(resp)
@@ -222,7 +222,7 @@ ensure_chezmoi() {
   export PATH="$TARGET_HOME/.local/bin:$PATH"
 
   run_as_target sh -c "touch \"\$HOME/.profile\""
-  run_as_target sh -c "grep -qs 'export PATH=\"\$HOME/.local/bin:\$PATH\"' \"\$HOME/.profile\" || printf '\n# Added by zshell bootstrap\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n' >> \"\$HOME/.profile\""
+  run_as_target sh -c "grep -qs 'export PATH=\"\$HOME/.local/bin:\$PATH\"' \"\$HOME/.profile\" || printf '\n# Added by bootstrap script\nexport PATH=\"\$HOME/.local/bin:\$PATH\"\n' >> \"\$HOME/.profile\""
 
   if [ -x "$TARGET_HOME/.local/bin/chezmoi" ]; then
     if [ -w /usr/local/bin ]; then
@@ -395,7 +395,7 @@ stage_server_prep_assets() {
     return
   fi
   detect_target_context
-  local prep_dir="$TARGET_HOME/.local/share/zshell/server_prep"
+  local prep_dir="$TARGET_HOME/.local/share/bootstrap/server_prep"
   local old_prep_dir="$TARGET_HOME/.local/share/chezmoi/scripts/server_prep"
   local old_target_dir="$TARGET_HOME/scripts/server_prep"
   local old_target_script="$TARGET_HOME/scripts/server-prep.sh"
