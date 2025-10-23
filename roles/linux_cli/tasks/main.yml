@@ -1061,7 +1061,7 @@
 - name: Discover existing MOTD scripts
   ansible.builtin.find:
     paths: /etc/update-motd.d
-    file_type: any
+    file_type: file
   register: motd_scripts
   when:
     - ansible_facts.os_family == "Debian"
