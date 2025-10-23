@@ -1047,11 +1047,18 @@
     content: |
       #!/bin/sh
       FASTFETCH_CFG="/etc/update-motd.d/fastfetch.jsonc"
+      USER_NAME="${PAM_USER:-${LOGNAME:-$(id -un 2>/dev/null)}}"
+      EXEC_CMD="fastfetch"
+      if [ -r "$FASTFETCH_CFG" ]; then
+        EXEC_CMD="fastfetch --config \"$FASTFETCH_CFG\""
+      fi
       if command -v fastfetch >/dev/null 2>&1; then
-        if [ -r "$FASTFETCH_CFG" ]; then
-          fastfetch --config "$FASTFETCH_CFG" 2>/dev/null || fastfetch 2>/dev/null
+        if command -v runuser >/dev/null 2>&1 && [ -n "$USER_NAME" ]; then
+          runuser -u "$USER_NAME" -- sh -c "$EXEC_CMD" 2>/dev/null || runuser -u "$USER_NAME" -- fastfetch 2>/dev/null
+        elif command -v sudo >/dev/null 2>&1 && [ -n "$USER_NAME" ]; then
+          sudo -u "$USER_NAME" -- sh -c "$EXEC_CMD" 2>/dev/null || sudo -u "$USER_NAME" -- fastfetch 2>/dev/null
         else
-          fastfetch 2>/dev/null
+          sh -c "$EXEC_CMD" 2>/dev/null || fastfetch 2>/dev/null
         fi
       fi
   when:
