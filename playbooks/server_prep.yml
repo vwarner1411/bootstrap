@@ -203,8 +203,6 @@
 
     - name: Truncate log files under /var/log
       ansible.builtin.shell: "find /var/log -type f -exec truncate -s 0 {} +"
-      args:
-        warn: false
 
     - name: Clean temporary directories
       ansible.builtin.file:
