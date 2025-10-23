@@ -5,9 +5,6 @@ shell_extras_zsh_plugins:
   - repo: https://github.com/zsh-users/zsh-autosuggestions.git
     dest: "{{ shell_extras_oh_my_zsh_custom }}/plugins/zsh-autosuggestions"
     version: master
-  - repo: https://github.com/marlonrichert/zsh-autocomplete.git
-    dest: "{{ shell_extras_oh_my_zsh_custom }}/plugins/zsh-autocomplete"
-    version: main
   - repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
     dest: "{{ shell_extras_oh_my_zsh_custom }}/plugins/zsh-syntax-highlighting"
     version: master
