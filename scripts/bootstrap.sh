@@ -370,7 +370,7 @@ run_chezmoi() {
   chez_cmd+="   fi;"
   chez_cmd+="   if ! chezmoi update --apply; then"
   chez_cmd+="     echo '[chezmoi] update failed; attempting direct apply' >&2;"
-  chez_cmd+="     chezmoi apply;"
+  chez_cmd+="     chezmoi apply --force;"
   chez_cmd+="   fi;"
   chez_cmd+=" else"
   init_repo="$CHEZMOI_REPO"
