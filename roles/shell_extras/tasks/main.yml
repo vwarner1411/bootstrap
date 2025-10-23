@@ -29,6 +29,21 @@
     shell_extras_zshrc_dir: "{{ shell_extras_target_home }}/.zshrc.d"
   become: false
 
+- name: Check existing oh-my-zsh repo
+  ansible.builtin.stat:
+    path: "{{ shell_extras_oh_my_zsh_dir }}/.git"
+  register: shell_extras_ohmyzsh_git
+  become: false
+
+- name: Remove stale oh-my-zsh directory
+  ansible.builtin.file:
+    path: "{{ shell_extras_oh_my_zsh_dir }}"
+    state: absent
+  when:
+    - shell_extras_ohmyzsh_git.stat.exists is defined
+    - not shell_extras_ohmyzsh_git.stat.exists
+  become: false
+
 - name: Install oh-my-zsh
   ansible.builtin.git:
     repo: "{{ shell_extras_oh_my_zsh_repo }}"
