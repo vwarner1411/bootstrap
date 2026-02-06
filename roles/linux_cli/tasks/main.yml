@@ -1623,61 +1623,96 @@
       }}
   when: ansible_facts.os_family == "Debian"
 
-- name: Ensure ripgrep build dependencies are installed
-  ansible.builtin.apt:
-    name:
-      - cargo
-      - rustc
-      - pkg-config
-    state: present
-  when:
-    - ansible_facts.os_family == "Debian"
-    - ripgrep_install_required
-
-- name: Set ripgrep build paths
+- name: Build ripgrep asset candidate list
   ansible.builtin.set_fact:
-    ripgrep_source_archive: "{{ linux_cli_download_dir }}/ripgrep.tar.gz"
-    ripgrep_source_dir: "{{ linux_cli_download_dir }}/ripgrep-{{ ripgrep_release_tag }}"
+    ripgrep_asset_candidates: >-
+      {{
+        [
+          'ripgrep-' ~ ripgrep_target_version ~ '-' ~ arch_cpu ~ '-unknown-linux-musl.tar.gz',
+          'ripgrep-' ~ ripgrep_target_version ~ '-' ~ arch_cpu ~ '-unknown-linux-gnu.tar.gz',
+          'ripgrep-' ~ ripgrep_target_version ~ '-' ~ arch_go ~ '-unknown-linux-musl.tar.gz',
+          'ripgrep-' ~ ripgrep_target_version ~ '-' ~ arch_go ~ '-unknown-linux-gnu.tar.gz'
+        ]
+        | unique
+      }}
   when: ansible_facts.os_family == "Debian"
 
-- name: Download ripgrep source archive
+- name: Set ripgrep available assets
+  ansible.builtin.set_fact:
+    ripgrep_available_assets: "{{ ripgrep_release.json.assets | default([]) | map(attribute='name') | list }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Initialize ripgrep asset name
+  ansible.builtin.set_fact:
+    ripgrep_asset_name: ""
+  when: ansible_facts.os_family == "Debian"
+
+- name: Select ripgrep asset candidate
+  ansible.builtin.set_fact:
+    ripgrep_asset_name: "{{ item }}"
+  loop: "{{ ripgrep_asset_candidates }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (ripgrep_asset_name | default('')) == ""
+    - item in ripgrep_available_assets
+
+- name: Set ripgrep asset URL
+  ansible.builtin.set_fact:
+    ripgrep_asset: >-
+      {{
+        (ripgrep_release.json.assets | default([]))
+        | selectattr('name', 'equalto', ripgrep_asset_name)
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fail if no ripgrep asset found
+  ansible.builtin.fail:
+    msg: "No matching ripgrep release asset found for arch {{ arch_cpu }} (version {{ ripgrep_target_version }})"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_asset | length == 0
+
+- name: Set ripgrep download paths
+  ansible.builtin.set_fact:
+    ripgrep_archive_path: "{{ linux_cli_download_dir }}/ripgrep.tar.gz"
+    ripgrep_extract_dir: "{{ linux_cli_download_dir }}/{{ ripgrep_asset_name | regex_replace('\\.tar\\.gz$', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download ripgrep release archive
   ansible.builtin.get_url:
-    url: "https://github.com/BurntSushi/ripgrep/archive/refs/tags/{{ ripgrep_release_tag }}.tar.gz"
-    dest: "{{ ripgrep_source_archive }}"
+    url: "{{ ripgrep_asset }}"
+    dest: "{{ ripgrep_archive_path }}"
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required
 
-- name: Remove previous ripgrep source tree
+- name: Remove previous ripgrep extract directory
   ansible.builtin.file:
-    path: "{{ ripgrep_source_dir }}"
+    path: "{{ ripgrep_extract_dir }}"
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required
 
-- name: Unpack ripgrep source archive
+- name: Unpack ripgrep release archive
   ansible.builtin.unarchive:
-    src: "{{ ripgrep_source_archive }}"
+    src: "{{ ripgrep_archive_path }}"
     dest: "{{ linux_cli_download_dir }}"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required
 
-- name: Build ripgrep from source
-  ansible.builtin.command:
-    cmd: cargo build --release --locked
-    chdir: "{{ ripgrep_source_dir }}"
-    creates: "{{ ripgrep_source_dir }}/target/release/rg"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - ripgrep_install_required
-
 - name: Install ripgrep binary
   ansible.builtin.copy:
-    src: "{{ ripgrep_source_dir }}/target/release/rg"
+    src: "{{ ripgrep_extract_dir }}/rg"
     dest: /usr/local/bin/rg
     mode: "0755"
     remote_src: true
@@ -1685,17 +1720,17 @@
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required
 
-- name: Remove ripgrep source tree
+- name: Remove ripgrep extract directory
   ansible.builtin.file:
-    path: "{{ ripgrep_source_dir }}"
+    path: "{{ ripgrep_extract_dir }}"
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required
 
-- name: Clean ripgrep source archive
+- name: Clean ripgrep release archive
   ansible.builtin.file:
-    path: "{{ ripgrep_source_archive }}"
+    path: "{{ ripgrep_archive_path }}"
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
