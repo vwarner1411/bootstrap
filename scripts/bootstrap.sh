@@ -131,6 +131,7 @@ ensure_prereqs_linux() {
     ca-certificates \
     curl \
     git \
+    rsync \
     python3 \
     python3-pip \
     python3-venv \
@@ -367,7 +368,13 @@ clone_repo() {
 
     if [ "$source_real" != "$workdir_real" ]; then
       log "Syncing local working tree from $source_real to $workdir_real"
-      rsync -a --delete --exclude ".git/" "$source_real"/ "$workdir_real"/
+      if command_exists rsync; then
+        rsync -a --delete --exclude ".git/" "$source_real"/ "$workdir_real"/
+      else
+        log "rsync not found; using tar fallback for local sync"
+        find "$workdir_real" -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+        tar -C "$source_real" --exclude=".git" -cf - . | tar -C "$workdir_real" -xf -
+      fi
     else
       log "WORKDIR matches source repository; using current tree in place"
     fi
