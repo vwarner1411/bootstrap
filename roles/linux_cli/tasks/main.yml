@@ -1633,7 +1633,7 @@
           | list
           | unique
           | map('regex_replace', '^', 'ripgrep-' ~ linux_cli_ripgrep_target_version ~ '-')
-          | map('regex_replace', '$', '-unknown-linux-musl.tar.gz')
+          | map('regex_replace', '$', '-unknown-linux-gnu.tar.gz')
           | list
         )
         +
@@ -1643,7 +1643,7 @@
           | list
           | unique
           | map('regex_replace', '^', 'ripgrep-' ~ linux_cli_ripgrep_target_version ~ '-')
-          | map('regex_replace', '$', '-unknown-linux-gnu.tar.gz')
+          | map('regex_replace', '$', '-unknown-linux-musl.tar.gz')
           | list
         )
       }}
@@ -1692,14 +1692,23 @@
 
 - name: Set ripgrep download paths
   ansible.builtin.set_fact:
-    linux_cli_ripgrep_archive_path: "{{ linux_cli_download_dir }}/ripgrep.tar.gz"
+    linux_cli_ripgrep_archive_path: "{{ linux_cli_download_dir }}/{{ linux_cli_ripgrep_asset_name }}"
   when: ansible_facts.os_family == "Debian"
+
+- name: Remove previous ripgrep release archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_ripgrep_archive_path }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_ripgrep_install_required
 
 - name: Download ripgrep release archive
   ansible.builtin.get_url:
     url: "{{ linux_cli_ripgrep_asset }}"
     dest: "{{ linux_cli_ripgrep_archive_path }}"
     mode: "0644"
+    force: true
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_ripgrep_install_required
