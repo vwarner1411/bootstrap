@@ -402,8 +402,19 @@ clone_repo() {
     fi
     log "Updating repository in $WORKDIR"
     git -C "$WORKDIR" fetch origin
-    git -C "$WORKDIR" checkout "$REPO_BRANCH"
-    git -C "$WORKDIR" pull --ff-only origin "$REPO_BRANCH"
+    if [ -n "$(git -C "$WORKDIR" status --porcelain 2>/dev/null || true)" ]; then
+      log "Discarding local changes in $WORKDIR before sync"
+    fi
+    git -C "$WORKDIR" reset --hard >/dev/null 2>&1 || true
+    git -C "$WORKDIR" clean -fdx >/dev/null 2>&1 || true
+    if git -C "$WORKDIR" show-ref --verify --quiet "refs/remotes/origin/$REPO_BRANCH"; then
+      git -C "$WORKDIR" checkout -B "$REPO_BRANCH" "origin/$REPO_BRANCH"
+      git -C "$WORKDIR" reset --hard "origin/$REPO_BRANCH"
+      git -C "$WORKDIR" clean -fdx
+    else
+      err "Remote branch $REPO_BRANCH not found on origin"
+      return 1
+    fi
   else
     log "Cloning repository to $WORKDIR"
     git clone --branch "$REPO_BRANCH" "$REPO_URL" "$WORKDIR"
