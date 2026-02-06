@@ -87,7 +87,7 @@ jobs:
           ansible-playbook --version
           test -d "$HOME/.oh-my-zsh"
 
-  bootstrap-e2e:
+  linux-e2e:
     runs-on: ubuntu-latest
     needs:
       - linux-smoke

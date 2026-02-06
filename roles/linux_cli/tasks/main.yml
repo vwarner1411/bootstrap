@@ -1727,14 +1727,60 @@
     src: "{{ linux_cli_ripgrep_archive_path }}"
     dest: "{{ linux_cli_download_dir }}/ripgrep_extract"
     remote_src: true
-    creates: "{{ linux_cli_ripgrep_extract_dir }}/rg"
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_ripgrep_install_required
 
+- name: Check expected ripgrep binary path
+  ansible.builtin.stat:
+    path: "{{ linux_cli_ripgrep_extract_dir }}/rg"
+  register: linux_cli_ripgrep_expected_binary
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_ripgrep_install_required
+
+- name: Locate ripgrep binary in extracted tree
+  ansible.builtin.find:
+    paths: "{{ linux_cli_download_dir }}/ripgrep_extract"
+    recurse: true
+    file_type: file
+    patterns:
+      - rg
+  register: linux_cli_ripgrep_binary_matches
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_ripgrep_install_required
+    - not linux_cli_ripgrep_expected_binary.stat.exists
+
+- name: Set ripgrep binary source path
+  ansible.builtin.set_fact:
+    linux_cli_ripgrep_binary_path: >-
+      {{
+        (linux_cli_ripgrep_extract_dir ~ '/rg')
+        if linux_cli_ripgrep_expected_binary.stat.exists
+        else (
+          linux_cli_ripgrep_binary_matches.files
+          | map(attribute='path')
+          | list
+          | first
+          | default('')
+        )
+      }}
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_ripgrep_install_required
+
+- name: Fail if ripgrep binary was not found after extraction
+  ansible.builtin.fail:
+    msg: "Unable to locate rg binary in extracted ripgrep archive."
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_ripgrep_install_required
+    - linux_cli_ripgrep_binary_path | length == 0
+
 - name: Install ripgrep binary
   ansible.builtin.copy:
-    src: "{{ linux_cli_ripgrep_extract_dir }}/rg"
+    src: "{{ linux_cli_ripgrep_binary_path }}"
     dest: /usr/local/bin/rg
     mode: "0755"
     remote_src: true
