@@ -20,6 +20,7 @@ REPO_BRANCH="${REPO_BRANCH:-main}"
 CHEZMOI_REPO="${CHEZMOI_REPO:-https://github.com/vwarner1411/dotfiles.git}"
 WORKDIR="${WORKDIR:-$HOME/.local/share/bootstrap}"
 PROFILE="${PROFILE:-desktop}"
+ANSIBLE_EXTRA_VARS="${ANSIBLE_EXTRA_VARS:-}"
 
 TARGET_USER="${TARGET_USER_OVERRIDE:-}"
 TARGET_HOME="${TARGET_HOME_OVERRIDE:-}"
@@ -478,6 +479,9 @@ run_playbook() {
   local extra_vars
   extra_vars="profile=${PROFILE} shell_user=${TARGET_USER} shell_home=${TARGET_HOME}"
   local cmd=(ansible-playbook playbooks/bootstrap.yml --extra-vars "$extra_vars")
+  if [ -n "$ANSIBLE_EXTRA_VARS" ]; then
+    cmd+=(--extra-vars "$ANSIBLE_EXTRA_VARS")
+  fi
   if [ "$EUID" -ne 0 ] && [ -t 0 ]; then
     cmd+=(--ask-become-pass)
   fi

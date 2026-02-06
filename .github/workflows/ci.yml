@@ -44,7 +44,12 @@ jobs:
             eval "$(/usr/local/bin/brew shellenv)"
           fi
           brew update
-          brew install shellcheck python ansible ansible-lint
+          brew install shellcheck python
+          python3 -m venv .venv-ci
+          . .venv-ci/bin/activate
+          python -m pip install --upgrade pip
+          pip install ansible ansible-lint
+          echo "$PWD/.venv-ci/bin" >> "$GITHUB_PATH"
 
       - name: Install Ansible collections
         run: |
@@ -53,6 +58,34 @@ jobs:
       - name: Run smoke tests
         run: |
           ./tests/smoke.sh
+
+  macos-e2e:
+    runs-on: macos-latest
+    needs:
+      - macos-smoke
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run bootstrap script on macOS with fixture dotfiles
+        run: |
+          if [ -x /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+          elif [ -x /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+          fi
+          export REPO_URL="file://$PWD"
+          export REPO_BRANCH="${GITHUB_REF_NAME:-main}"
+          export CHEZMOI_REPO="$PWD/tests/fixtures/chezmoi"
+          export WORKDIR="$RUNNER_TEMP/bootstrap-e2e"
+          export PROFILE="server"
+          export ANSIBLE_EXTRA_VARS='{"common_core_brew_packages":[],"macos_cli_brew_packages":["git","curl","python","ansible","ripgrep","gnupg"],"macos_cli_cask_packages":[]}'
+          ./scripts/bootstrap.sh
+          export PATH="$HOME/.local/bin:$PATH"
+          rg --version
+          gpg --version
+          ansible-playbook --version
+          test -d "$HOME/.oh-my-zsh"
 
   bootstrap-e2e:
     runs-on: ubuntu-latest

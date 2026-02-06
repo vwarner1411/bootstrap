@@ -20,6 +20,7 @@ Environment variables:
 - `PROFILE=server|desktop` (default `desktop`)
 - `REPO_BRANCH` (defaults to `main`)
 - `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
+- `ANSIBLE_EXTRA_VARS` (optional raw `--extra-vars` payload for advanced overrides)
 
 The `server` profile skips desktop niceties (`powershell`, `kitty`, `starship`, `yt-dlp`) while still installing the core CLI stack.
 
