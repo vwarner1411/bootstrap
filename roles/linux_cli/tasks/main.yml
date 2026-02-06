@@ -1740,13 +1740,16 @@
     - linux_cli_ripgrep_install_required
 
 - name: Locate ripgrep binary in extracted tree
-  ansible.builtin.find:
-    paths: "{{ linux_cli_download_dir }}/ripgrep_extract"
-    recurse: true
-    file_type: file
-    patterns:
+  ansible.builtin.command:
+    argv:
+      - find
+      - "{{ linux_cli_download_dir }}/ripgrep_extract"
+      - -name
       - rg
-  register: linux_cli_ripgrep_binary_matches
+      - -print
+      - -quit
+  register: linux_cli_ripgrep_binary_lookup
+  changed_when: false
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_ripgrep_install_required
@@ -1759,11 +1762,9 @@
         (linux_cli_ripgrep_extract_dir ~ '/rg')
         if linux_cli_ripgrep_expected_binary.stat.exists
         else (
-          linux_cli_ripgrep_binary_matches.files
-          | map(attribute='path')
-          | list
-          | first
+          linux_cli_ripgrep_binary_lookup.stdout
           | default('')
+          | trim
         )
       }}
   when:
