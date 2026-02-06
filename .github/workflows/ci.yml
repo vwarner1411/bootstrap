@@ -9,7 +9,7 @@ name: CI
       - main
 
 jobs:
-  tests:
+  linux-smoke:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -90,7 +90,7 @@ jobs:
   bootstrap-e2e:
     runs-on: ubuntu-latest
     needs:
-      - tests
+      - linux-smoke
     steps:
       - name: Checkout
         uses: actions/checkout@v4
