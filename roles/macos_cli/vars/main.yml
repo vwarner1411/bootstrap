@@ -19,6 +19,7 @@ macos_cli_brew_packages:
   - yazi
   - fzf
   - ripgrep
+  - tealdeer
   - fastfetch
   - yt-dlp
   - ansible

@@ -1571,6 +1571,185 @@
     msg: "yt-dlp version after install: {{ linux_cli_ytdlp_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
 
+# tealdeer #####################################################################
+- name: Check current tealdeer version
+  ansible.builtin.command: tldr --version
+  register: linux_cli_tealdeer_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute existing tealdeer version string
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_version_pretty: >-
+      {{ (linux_cli_tealdeer_version_check.rc == 0) | ternary((linux_cli_tealdeer_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest tealdeer release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/tealdeer-rs/tealdeer/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: bootstrap-ansible
+  register: linux_cli_tealdeer_release
+  retries: 3
+  delay: 2
+  until: linux_cli_tealdeer_release.status == 200
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set tealdeer release facts
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_release_tag: "{{ linux_cli_tealdeer_release.json.tag_name | default('') }}"
+    linux_cli_tealdeer_target_version: "{{ (linux_cli_tealdeer_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fail if tealdeer release tag is unavailable
+  ansible.builtin.fail:
+    msg: "Unable to determine latest tealdeer release tag."
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tealdeer_release_tag | length == 0
+
+- name: Build tealdeer asset candidate list
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_asset_candidates: >-
+      {{
+        (
+          [linux_cli_arch_cpu, linux_cli_arch_go]
+          | reject('equalto', '')
+          | list
+          | unique
+          | map('regex_replace', '^', 'tealdeer-linux-')
+          | map('regex_replace', '$', '-gnu')
+          | list
+        )
+        +
+        (
+          [linux_cli_arch_cpu, linux_cli_arch_go]
+          | reject('equalto', '')
+          | list
+          | unique
+          | map('regex_replace', '^', 'tealdeer-linux-')
+          | map('regex_replace', '$', '-musl')
+          | list
+        )
+        | unique
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set tealdeer available assets
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_available_assets: "{{ linux_cli_tealdeer_release.json.assets | default([]) | map(attribute='name') | list }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Initialize tealdeer asset name
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_asset_name: ""
+  when: ansible_facts.os_family == "Debian"
+
+- name: Select tealdeer asset candidate
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_asset_name: "{{ item }}"
+  loop: "{{ linux_cli_tealdeer_asset_candidates }}"
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (linux_cli_tealdeer_asset_name | default('')) == ""
+    - item in linux_cli_tealdeer_available_assets
+
+- name: Set tealdeer asset URL
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_asset: >-
+      {{
+        (linux_cli_tealdeer_release.json.assets | default([]))
+        | selectattr('name', 'equalto', linux_cli_tealdeer_asset_name)
+        | map(attribute='browser_download_url')
+        | list
+        | first
+        | default('', true)
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fail if no tealdeer asset found
+  ansible.builtin.fail:
+    msg: "No matching tealdeer release asset found for arch {{ linux_cli_arch_cpu }} (version {{ linux_cli_tealdeer_target_version }})"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tealdeer_asset | length == 0
+
+- name: Determine if tealdeer install is required
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_install_required: >-
+      {{
+        (linux_cli_tealdeer_asset | length > 0) and
+        (
+          (linux_cli_tealdeer_version_check.rc | default(1)) != 0 or
+          (linux_cli_tealdeer_version_check.stdout is defined and linux_cli_tealdeer_target_version not in linux_cli_tealdeer_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set tealdeer download path
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_binary_path: "{{ linux_cli_download_dir }}/{{ linux_cli_tealdeer_asset_name }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Remove previous tealdeer download
+  ansible.builtin.file:
+    path: "{{ linux_cli_tealdeer_binary_path }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tealdeer_install_required
+
+- name: Download tealdeer release binary
+  ansible.builtin.get_url:
+    url: "{{ linux_cli_tealdeer_asset }}"
+    dest: "{{ linux_cli_tealdeer_binary_path }}"
+    mode: "0755"
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tealdeer_install_required
+
+- name: Install tealdeer binary as tldr
+  ansible.builtin.copy:
+    src: "{{ linux_cli_tealdeer_binary_path }}"
+    dest: /usr/local/bin/tldr
+    mode: "0755"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tealdeer_install_required
+
+- name: Clean tealdeer download
+  ansible.builtin.file:
+    path: "{{ linux_cli_tealdeer_binary_path }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tealdeer_install_required
+
+- name: Capture tealdeer version after install
+  ansible.builtin.command: tldr --version
+  register: linux_cli_tealdeer_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed tealdeer version string
+  ansible.builtin.set_fact:
+    linux_cli_tealdeer_version_post_pretty: >-
+      {{ (linux_cli_tealdeer_version_post.rc == 0) | ternary((linux_cli_tealdeer_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed tealdeer version
+  ansible.builtin.debug:
+    msg: "tealdeer version after install: {{ linux_cli_tealdeer_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
 # ripgrep ######################################################################
 - name: Check current ripgrep version
   ansible.builtin.command: rg --version

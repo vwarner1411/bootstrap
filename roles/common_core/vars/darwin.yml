@@ -20,6 +20,7 @@ common_core_brew_packages:
   - yazi
   - fzf
   - ripgrep
+  - tealdeer
   - yt-dlp
   - powershell
   - zip
