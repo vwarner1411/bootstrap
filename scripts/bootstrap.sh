@@ -5,8 +5,12 @@ DEFAULT_REPO_URL="https://github.com/vwarner1411/bootstrap.git"
 REPO_URL="${REPO_URL:-}"
 REPO_BRANCH="${REPO_BRANCH:-}"
 if [ -z "$REPO_URL" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if command -v git >/dev/null 2>&1 && git -C "$SCRIPT_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
+  SCRIPT_SOURCE="${BASH_SOURCE[0]-}"
+  SCRIPT_DIR=""
+  if [ -n "$SCRIPT_SOURCE" ] && [ -f "$SCRIPT_SOURCE" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+  fi
+  if [ -n "$SCRIPT_DIR" ] && command -v git >/dev/null 2>&1 && git -C "$SCRIPT_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
     LOCAL_REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
     REPO_URL="file://${LOCAL_REPO_ROOT}"
     if [ -z "$REPO_BRANCH" ]; then
