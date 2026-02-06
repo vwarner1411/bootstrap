@@ -27,6 +27,57 @@
     - ansible_facts.os_family == "Debian"
     - ('kitty' in linux_cli_skip_tools)
 
+- name: Check if tldr package is available on Debian
+  ansible.builtin.command:
+    argv:
+      - apt-cache
+      - show
+      - tldr
+  register: linux_cli_tldr_package_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Check if tealdeer package is available on Debian
+  ansible.builtin.command:
+    argv:
+      - apt-cache
+      - show
+      - tealdeer
+  register: linux_cli_tealdeer_package_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (linux_cli_tldr_package_check.rc | default(1)) != 0
+
+- name: Choose Debian package for tldr command
+  ansible.builtin.set_fact:
+    linux_cli_tldr_package_name: >-
+      {{
+        'tldr' if (linux_cli_tldr_package_check.rc | default(1)) == 0
+        else (
+          'tealdeer' if (linux_cli_tealdeer_package_check.rc | default(1)) == 0
+          else ''
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fail if no Debian package provides tldr command
+  ansible.builtin.fail:
+    msg: "Neither tldr nor tealdeer package is available from apt repositories."
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tldr_package_name | length == 0
+
+- name: Install tldr command package on Debian
+  ansible.builtin.apt:
+    name: "{{ linux_cli_tldr_package_name }}"
+    state: present
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_tldr_package_name | length > 0
+
 - name: Define GitHub download staging directory
   ansible.builtin.set_fact:
     linux_cli_download_dir: /tmp/bootstrap-github-downloads
