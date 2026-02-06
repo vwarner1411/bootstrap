@@ -25,7 +25,29 @@
 
 - name: Determine desktop tools target user
   ansible.builtin.set_fact:
-    desktop_tools_target_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('LOGNAME', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root'))))) }}"
+    desktop_tools_target_user: >-
+      {{
+        shell_user
+        | default(
+            (ansible_facts['env'] | default({})).get(
+              'SUDO_USER',
+              (ansible_facts['env'] | default({})).get(
+                'LOGNAME',
+                (ansible_facts['env'] | default({})).get(
+                  'USER',
+                  ansible_facts['user_id'] | default('root')
+                )
+              )
+            )
+          )
+      }}
+    desktop_tools_target_home: >-
+      {{
+        shell_home
+        | default(
+            (ansible_facts['env'] | default({})).get('HOME', '/var/root')
+          )
+      }}
   become: false
 
 - name: Determine if desktop tools tasks should switch user
@@ -35,7 +57,7 @@
 
 - name: Check for oh-my-zsh custom directory
   ansible.builtin.stat:
-    path: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}/.oh-my-zsh/custom"
+    path: "{{ desktop_tools_target_home }}/.oh-my-zsh/custom"
   register: ohmyzsh_custom_dir
   become: "{{ desktop_tools_run_as_target }}"
   become_user: "{{ desktop_tools_target_user }}"
@@ -50,9 +72,9 @@
   when: ohmyzsh_custom_dir.stat.exists
 
 - name: Install Starship completions
-  ansible.builtin.shell: "starship completions zsh > {{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}/.oh-my-zsh/custom/starship.zsh"
+  ansible.builtin.shell: "starship completions zsh > {{ desktop_tools_target_home }}/.oh-my-zsh/custom/starship.zsh"
   args:
-    creates: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}/.oh-my-zsh/custom/starship.zsh"
+    creates: "{{ desktop_tools_target_home }}/.oh-my-zsh/custom/starship.zsh"
   become: "{{ desktop_tools_run_as_target }}"
   become_user: "{{ desktop_tools_target_user }}"
   when:

@@ -1670,6 +1670,7 @@
   ansible.builtin.command:
     cmd: cargo build --release --locked
     chdir: "{{ ripgrep_source_dir }}"
+    creates: "{{ ripgrep_source_dir }}/target/release/rg"
   when:
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required

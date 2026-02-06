@@ -1,6 +1,21 @@
 - name: Determine shell extras target user
   ansible.builtin.set_fact:
-    shell_extras_target_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('LOGNAME', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root'))))) }}"
+    shell_extras_target_user: >-
+      {{
+        shell_user
+        | default(
+            (ansible_facts['env'] | default({})).get(
+              'SUDO_USER',
+              (ansible_facts['env'] | default({})).get(
+                'LOGNAME',
+                (ansible_facts['env'] | default({})).get(
+                  'USER',
+                  ansible_facts['user_id'] | default('root')
+                )
+              )
+            )
+          )
+      }}
   become: false
 
 - name: Lookup shell extras target home with Python

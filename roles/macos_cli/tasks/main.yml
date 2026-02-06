@@ -1,21 +1,47 @@
+- name: Resolve Homebrew execution context for macos_cli
+  ansible.builtin.set_fact:
+    macos_cli_target_user: >-
+      {{
+        shell_user
+        | default(
+            (ansible_facts['env'] | default({})).get(
+              'SUDO_USER',
+              (ansible_facts['env'] | default({})).get(
+                'USER',
+                ansible_facts['user_id'] | default('root')
+              )
+            )
+          )
+      }}
+    macos_cli_target_home: >-
+      {{
+        shell_home
+        | default(
+            (ansible_facts['env'] | default({})).get('HOME', '/var/root')
+          )
+      }}
+    macos_cli_target_path: >-
+      /opt/homebrew/bin:/usr/local/bin:{{ (ansible_facts['env'] | default({})).get('PATH', '/usr/bin:/bin') }}
+  when: ansible_facts.system == "Darwin"
+
 - name: Ensure Homebrew bundle for CLI tools is installed
   community.general.homebrew:
     name: "{{ macos_cli_brew_packages }}"
     state: latest
     update_homebrew: true
   become: "{{ (ansible_facts['user_id'] | default('')) == 'root' }}"
-  become_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root')))) }}"
+  become_user: "{{ macos_cli_target_user }}"
   environment:
-    HOME: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}"
-    PATH: "/opt/homebrew/bin:/usr/local/bin:{{ (ansible_facts['env'] | default({})).get('PATH', '/usr/bin:/bin') }}"
+    HOME: "{{ macos_cli_target_home }}"
+    PATH: "{{ macos_cli_target_path }}"
 
 - name: Install Homebrew casks for desktop tools
   community.general.homebrew_cask:
     name: "{{ macos_cli_cask_packages }}"
     state: latest
   become: "{{ (ansible_facts['user_id'] | default('')) == 'root' }}"
-  become_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root')))) }}"
+  become_user: "{{ macos_cli_target_user }}"
   environment:
-    HOME: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}"
-    PATH: "/opt/homebrew/bin:/usr/local/bin:{{ (ansible_facts['env'] | default({})).get('PATH', '/usr/bin:/bin') }}"
+    HOME: "{{ macos_cli_target_home }}"
+    PATH: "{{ macos_cli_target_path }}"
   when: macos_cli_cask_packages | length > 0
