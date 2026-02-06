@@ -9,7 +9,7 @@
 - name: Check kitty desktop entry availability
   ansible.builtin.stat:
     path: /opt/kitty/share/applications/kitty.desktop
-  register: kitty_desktop_entry
+  register: desktop_tools_kitty_desktop_entry
   when: ansible_facts.os_family == "Debian"
 
 - name: Ensure kitty desktop entry symlink exists
@@ -20,7 +20,7 @@
     force: true
   when:
     - ansible_facts.os_family == "Debian"
-    - kitty_desktop_entry.stat.exists
+    - desktop_tools_kitty_desktop_entry.stat.exists
     - (ansible_facts.get('distribution_major_version', '0') | int) >= 24
 
 - name: Determine desktop tools target user
@@ -58,18 +58,18 @@
 - name: Check for oh-my-zsh custom directory
   ansible.builtin.stat:
     path: "{{ desktop_tools_target_home }}/.oh-my-zsh/custom"
-  register: ohmyzsh_custom_dir
+  register: desktop_tools_ohmyzsh_custom_dir
   become: "{{ desktop_tools_run_as_target }}"
   become_user: "{{ desktop_tools_target_user }}"
 
 - name: Check for starship binary
   ansible.builtin.command: starship --version
-  register: starship_cli_check
+  register: desktop_tools_starship_cli_check
   changed_when: false
   failed_when: false
   become: "{{ desktop_tools_run_as_target }}"
   become_user: "{{ desktop_tools_target_user }}"
-  when: ohmyzsh_custom_dir.stat.exists
+  when: desktop_tools_ohmyzsh_custom_dir.stat.exists
 
 - name: Install Starship completions
   ansible.builtin.shell: "starship completions zsh > {{ desktop_tools_target_home }}/.oh-my-zsh/custom/starship.zsh"
@@ -78,5 +78,5 @@
   become: "{{ desktop_tools_run_as_target }}"
   become_user: "{{ desktop_tools_target_user }}"
   when:
-    - ohmyzsh_custom_dir.stat.exists
-    - starship_cli_check.rc == 0
+    - desktop_tools_ohmyzsh_custom_dir.stat.exists
+    - desktop_tools_starship_cli_check.rc == 0

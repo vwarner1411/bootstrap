@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y shellcheck python3-pip python3-venv
           python3 -m pip install --upgrade pip
-          python3 -m pip install ansible==9.3.0 ansible-lint==24.6.0
+          python3 -m pip install ansible-core ansible-lint
 
       - name: Install Ansible collections
         run: |
@@ -48,7 +48,7 @@ jobs:
           python3 -m venv .venv-ci
           . .venv-ci/bin/activate
           python -m pip install --upgrade pip
-          pip install ansible==9.3.0 ansible-lint==24.6.0
+          pip install ansible-core ansible-lint
           echo "$PWD/.venv-ci/bin" >> "$GITHUB_PATH"
 
       - name: Install Ansible collections

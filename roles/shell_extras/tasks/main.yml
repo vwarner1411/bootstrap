@@ -93,7 +93,7 @@
     force: true
   become: "{{ shell_extras_run_as_target }}"
   become_user: "{{ shell_extras_target_user }}"
-  register: ohmyzsh_clone
+  register: shell_extras_ohmyzsh_clone
 
 - name: Ensure custom plugin directories exist
   ansible.builtin.file:

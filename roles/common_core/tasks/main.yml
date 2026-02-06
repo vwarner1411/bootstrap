@@ -44,7 +44,7 @@
 
 - name: Resolve Homebrew execution context (macOS)
   ansible.builtin.set_fact:
-    macos_brew_target_user: >-
+    common_core_macos_brew_target_user: >-
       {{
         shell_user
         | default(
@@ -57,14 +57,14 @@
             )
           )
       }}
-    macos_brew_target_home: >-
+    common_core_macos_brew_target_home: >-
       {{
         shell_home
         | default(
             (ansible_facts['env'] | default({})).get('HOME', '/var/root')
           )
       }}
-    macos_brew_target_path: >-
+    common_core_macos_brew_target_path: >-
       /opt/homebrew/bin:/usr/local/bin:{{ (ansible_facts['env'] | default({})).get('PATH', '/usr/bin:/bin') }}
   when: ansible_facts.system == "Darwin"
 
@@ -74,10 +74,10 @@
     update_homebrew: false
     state: present
   become: "{{ (ansible_facts['user_id'] | default('')) == 'root' }}"
-  become_user: "{{ macos_brew_target_user }}"
+  become_user: "{{ common_core_macos_brew_target_user }}"
   environment:
-    HOME: "{{ macos_brew_target_home }}"
-    PATH: "{{ macos_brew_target_path }}"
+    HOME: "{{ common_core_macos_brew_target_home }}"
+    PATH: "{{ common_core_macos_brew_target_path }}"
   when: ansible_facts.system == "Darwin"
 
 - name: Install core packages with Homebrew (macOS)
@@ -86,8 +86,8 @@
     state: latest
     update_homebrew: true
   become: "{{ (ansible_facts['user_id'] | default('')) == 'root' }}"
-  become_user: "{{ macos_brew_target_user }}"
+  become_user: "{{ common_core_macos_brew_target_user }}"
   environment:
-    HOME: "{{ macos_brew_target_home }}"
-    PATH: "{{ macos_brew_target_path }}"
+    HOME: "{{ common_core_macos_brew_target_home }}"
+    PATH: "{{ common_core_macos_brew_target_path }}"
   when: ansible_facts.system == "Darwin"
