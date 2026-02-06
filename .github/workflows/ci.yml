@@ -79,7 +79,7 @@ jobs:
           export CHEZMOI_REPO="$PWD/tests/fixtures/chezmoi"
           export WORKDIR="$RUNNER_TEMP/bootstrap-e2e"
           export PROFILE="server"
-          export ANSIBLE_EXTRA_VARS='{"common_core_brew_packages":[],"macos_cli_brew_packages":["git","curl","python","ansible","ripgrep","tldr","gnupg"],"macos_cli_cask_packages":[]}'
+          export ANSIBLE_EXTRA_VARS='{"common_core_brew_packages":[],"macos_cli_brew_packages":["git","curl","python","ansible","ripgrep","gnupg"],"macos_cli_cask_packages":[]}'
           ./scripts/bootstrap.sh
           export PATH="$HOME/.local/bin:$PATH"
           rg --version
