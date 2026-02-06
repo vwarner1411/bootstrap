@@ -1681,7 +1681,7 @@
 - name: Set ripgrep download paths
   ansible.builtin.set_fact:
     ripgrep_archive_path: "{{ linux_cli_download_dir }}/ripgrep.tar.gz"
-    ripgrep_extract_dir: "{{ linux_cli_download_dir }}/{{ ripgrep_asset_name | regex_replace('\\.tar\\.gz$', '') }}"
+    ripgrep_extract_root: "{{ linux_cli_download_dir }}/ripgrep_extract"
   when: ansible_facts.os_family == "Debian"
 
 - name: Download ripgrep release archive
@@ -1695,8 +1695,17 @@
 
 - name: Remove previous ripgrep extract directory
   ansible.builtin.file:
-    path: "{{ ripgrep_extract_dir }}"
+    path: "{{ ripgrep_extract_root }}"
     state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Ensure ripgrep extract directory exists
+  ansible.builtin.file:
+    path: "{{ ripgrep_extract_root }}"
+    state: directory
+    mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required
@@ -1704,15 +1713,35 @@
 - name: Unpack ripgrep release archive
   ansible.builtin.unarchive:
     src: "{{ ripgrep_archive_path }}"
-    dest: "{{ linux_cli_download_dir }}"
+    dest: "{{ ripgrep_extract_root }}"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
     - ripgrep_install_required
 
+- name: Locate ripgrep binary in extracted archive
+  ansible.builtin.find:
+    paths: "{{ ripgrep_extract_root }}"
+    recurse: true
+    file_type: file
+    patterns:
+      - rg
+  register: ripgrep_binary_matches
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Fail if extracted ripgrep binary is missing
+  ansible.builtin.fail:
+    msg: "Unable to locate rg binary in extracted ripgrep archive."
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+    - (ripgrep_binary_matches.files | default([]) | length) == 0
+
 - name: Install ripgrep binary
   ansible.builtin.copy:
-    src: "{{ ripgrep_extract_dir }}/rg"
+    src: "{{ (ripgrep_binary_matches.files | map(attribute='path') | list | first) }}"
     dest: /usr/local/bin/rg
     mode: "0755"
     remote_src: true
@@ -1722,7 +1751,7 @@
 
 - name: Remove ripgrep extract directory
   ansible.builtin.file:
-    path: "{{ ripgrep_extract_dir }}"
+    path: "{{ ripgrep_extract_root }}"
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
