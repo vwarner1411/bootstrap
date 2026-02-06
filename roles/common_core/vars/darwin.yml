@@ -3,6 +3,7 @@ common_core_brew_packages:
   - curl
   - git
   - jq
+  - gnupg
   - lynx
   - ncdu
   - neovim
@@ -18,6 +19,7 @@ common_core_brew_packages:
   - lsd
   - yazi
   - fzf
+  - ripgrep
   - yt-dlp
   - powershell
   - zip

@@ -1,23 +1,41 @@
 - name: Determine shell extras target user
   ansible.builtin.set_fact:
-    shell_extras_target_user: "{{ shell_user | default(ansible_env.SUDO_USER | default(ansible_env.LOGNAME | default(ansible_env.USER))) }}"
+    shell_extras_target_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('LOGNAME', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root'))))) }}"
   become: false
 
-- name: Lookup shell extras target home
-  ansible.builtin.getent:
-    database: passwd
-    key: "{{ shell_extras_target_user }}"
+- name: Lookup shell extras target home with Python
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - "import pwd,sys; print(pwd.getpwnam(sys.argv[1]).pw_dir)"
+      - "{{ shell_extras_target_user }}"
+  register: shell_extras_home_lookup
+  changed_when: false
+  failed_when: false
   become: false
+  when:
+    - shell_home is not defined or (shell_home | trim) == ""
 
 - name: Set shell extras target home
   ansible.builtin.set_fact:
     shell_extras_target_home: >-
       {{
         (
-          shell_home | default('')
-          or getent_passwd.get(shell_extras_target_user, [''] * 6)[4]
-          or ('/root' if shell_extras_target_user == 'root'
-              else '/home/' ~ shell_extras_target_user)
+          shell_home | default('') | trim
+          or
+          (
+            (shell_extras_home_lookup.stdout | default('') | trim)
+            if (shell_extras_home_lookup is defined and shell_extras_home_lookup.rc == 0)
+            else ''
+          )
+          or
+          (
+            '/var/root' if (shell_extras_target_user == 'root' and ansible_facts.system == 'Darwin')
+            else '/root' if shell_extras_target_user == 'root'
+            else '/Users/' ~ shell_extras_target_user if ansible_facts.system == 'Darwin'
+            else '/home/' ~ shell_extras_target_user
+          )
         ) | trim
       }}
   become: false
@@ -29,11 +47,17 @@
     shell_extras_zshrc_dir: "{{ shell_extras_target_home }}/.zshrc.d"
   become: false
 
+- name: Determine if shell extras tasks should switch user
+  ansible.builtin.set_fact:
+    shell_extras_run_as_target: "{{ (ansible_facts['user_id'] | default('')) == 'root' and shell_extras_target_user != 'root' }}"
+  become: false
+
 - name: Check existing oh-my-zsh repo
   ansible.builtin.stat:
     path: "{{ shell_extras_oh_my_zsh_dir }}/.git"
   register: shell_extras_ohmyzsh_git
-  become: false
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
 
 - name: Remove stale oh-my-zsh directory
   ansible.builtin.file:
@@ -42,7 +66,8 @@
   when:
     - shell_extras_ohmyzsh_git.stat.exists is defined
     - not shell_extras_ohmyzsh_git.stat.exists
-  become: false
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
 
 - name: Install oh-my-zsh
   ansible.builtin.git:
@@ -51,7 +76,8 @@
     version: master
     update: true
     force: true
-  become: false
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
   register: ohmyzsh_clone
 
 - name: Ensure custom plugin directories exist
@@ -59,7 +85,8 @@
     path: "{{ shell_extras_oh_my_zsh_custom }}/plugins"
     state: directory
     mode: "0755"
-  become: false
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
 
 - name: Clone Zsh plugins
   ansible.builtin.git:
@@ -68,17 +95,20 @@
     version: "{{ item.version | default('master') }}"
     update: true
   loop: "{{ shell_extras_zsh_plugins }}"
-  become: false
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
 
 - name: Ensure Zsh completions directory exists
   ansible.builtin.file:
     path: "{{ shell_extras_zshrc_dir }}"
     state: directory
     mode: "0755"
-  become: false
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
 
 - name: Refresh font cache
   ansible.builtin.command: fc-cache -f
   changed_when: false
-  become: false
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
   when: ansible_facts.os_family == "Debian"

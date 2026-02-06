@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/vwarner1411/bootstrap.git}"
+DEFAULT_REPO_URL="https://github.com/vwarner1411/bootstrap.git"
+REPO_URL="${REPO_URL:-}"
+REPO_BRANCH="${REPO_BRANCH:-}"
+if [ -z "$REPO_URL" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if command -v git >/dev/null 2>&1 && git -C "$SCRIPT_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
+    LOCAL_REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+    REPO_URL="file://${LOCAL_REPO_ROOT}"
+    if [ -z "$REPO_BRANCH" ]; then
+      REPO_BRANCH="$(git -C "$LOCAL_REPO_ROOT" rev-parse --abbrev-ref HEAD)"
+    fi
+  else
+    REPO_URL="$DEFAULT_REPO_URL"
+  fi
+fi
 REPO_BRANCH="${REPO_BRANCH:-main}"
 CHEZMOI_REPO="${CHEZMOI_REPO:-https://github.com/vwarner1411/dotfiles.git}"
 WORKDIR="${WORKDIR:-$HOME/.local/share/bootstrap}"
@@ -145,6 +159,7 @@ PY
 }
 
 ensure_prereqs_macos() {
+  local brew_bin=""
   if ! command_exists xcode-select; then
     err "Developer tools (xcode-select) not available; install manually before running."
     exit 1
@@ -152,12 +167,21 @@ ensure_prereqs_macos() {
   if ! command_exists brew; then
     log "Installing Homebrew"
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    if [ -d /opt/homebrew/bin ]; then
-      eval "$(/opt/homebrew/bin/brew shellenv)"
-    fi
-  else
-    eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
   fi
+
+  brew_bin="$(command -v brew || true)"
+  if [ -z "$brew_bin" ] && [ -x /opt/homebrew/bin/brew ]; then
+    brew_bin="/opt/homebrew/bin/brew"
+  fi
+  if [ -z "$brew_bin" ] && [ -x /usr/local/bin/brew ]; then
+    brew_bin="/usr/local/bin/brew"
+  fi
+  if [ -z "$brew_bin" ]; then
+    err "Homebrew not found after installation attempt."
+    exit 1
+  fi
+
+  eval "$("$brew_bin" shellenv)"
   log "Ensuring brew prerequisites"
   brew update
   brew install git curl ansible python || true
@@ -329,6 +353,26 @@ PY
 }
 
 clone_repo() {
+  local source_repo_path=""
+  if [[ "$REPO_URL" == file://* ]]; then
+    source_repo_path="${REPO_URL#file://}"
+  fi
+
+  if [ -n "$source_repo_path" ] && [ -d "$source_repo_path" ]; then
+    local source_real workdir_real
+    source_real="$(cd "$source_repo_path" && pwd -P)"
+    ensure_directory "$WORKDIR"
+    workdir_real="$(cd "$WORKDIR" && pwd -P)"
+
+    if [ "$source_real" != "$workdir_real" ]; then
+      log "Syncing local working tree from $source_real to $workdir_real"
+      rsync -a --delete --exclude ".git/" "$source_real"/ "$workdir_real"/
+    else
+      log "WORKDIR matches source repository; using current tree in place"
+    fi
+    return
+  fi
+
   if command_exists git; then
     local current_root
     current_root="$(pwd)"
@@ -338,6 +382,12 @@ clone_repo() {
   fi
   ensure_directory "$(dirname "$WORKDIR")"
   if [ -d "$WORKDIR/.git" ]; then
+    local origin_url
+    origin_url="$(git -C "$WORKDIR" remote get-url origin 2>/dev/null || true)"
+    if [ "$origin_url" != "$REPO_URL" ]; then
+      log "Updating bootstrap origin remote to $REPO_URL"
+      git -C "$WORKDIR" remote set-url origin "$REPO_URL"
+    fi
     log "Updating repository in $WORKDIR"
     git -C "$WORKDIR" fetch origin
     git -C "$WORKDIR" checkout "$REPO_BRANCH"
@@ -439,6 +489,11 @@ run_playbook() {
 main() {
   local os_id
   os_id=$(detect_os)
+  detect_target_context
+  if [ "$os_id" = "macos" ] && [ "$TARGET_USER" = "root" ]; then
+    err "On macOS, run bootstrap as a regular user (not root)."
+    exit 1
+  fi
   case "$os_id" in
     macos)
       ensure_prereqs_macos

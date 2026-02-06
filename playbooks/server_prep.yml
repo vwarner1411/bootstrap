@@ -48,8 +48,8 @@
       255.255.255.248: 29
       255.255.255.252: 30
       255.255.255.254: 31
-    server_prep_user_home: "{{ server_prep_user_home | default(ansible_env.HOME) }}"
-    server_prep_user: "{{ server_prep_user | default(ansible_env.USER) }}"
+    server_prep_user_home: "{{ server_prep_user_home | default((ansible_facts['env'] | default({})).get('HOME', '/root')) }}"
+    server_prep_user: "{{ server_prep_user | default((ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root'))) }}"
 
   pre_tasks:
     - name: Normalize DNS input string

@@ -1,5 +1,5 @@
 shell_extras_oh_my_zsh_repo: https://github.com/ohmyzsh/ohmyzsh.git
-shell_extras_oh_my_zsh_dir: "{{ ansible_env.HOME }}/.oh-my-zsh"
+shell_extras_oh_my_zsh_dir: "{{ (ansible_facts['env'] | default({})).get('HOME', '') }}/.oh-my-zsh"
 shell_extras_oh_my_zsh_custom: "{{ shell_extras_oh_my_zsh_dir }}/custom"
 shell_extras_zsh_plugins:
   - repo: https://github.com/TamCore/autoupdate-oh-my-zsh-plugins.git

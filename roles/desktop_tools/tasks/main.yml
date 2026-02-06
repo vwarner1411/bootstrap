@@ -23,25 +23,38 @@
     - kitty_desktop_entry.stat.exists
     - (ansible_facts.get('distribution_major_version', '0') | int) >= 24
 
+- name: Determine desktop tools target user
+  ansible.builtin.set_fact:
+    desktop_tools_target_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('LOGNAME', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root'))))) }}"
+  become: false
+
+- name: Determine if desktop tools tasks should switch user
+  ansible.builtin.set_fact:
+    desktop_tools_run_as_target: "{{ (ansible_facts['user_id'] | default('')) == 'root' and desktop_tools_target_user != 'root' }}"
+  become: false
+
 - name: Check for oh-my-zsh custom directory
   ansible.builtin.stat:
-    path: "{{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom"
+    path: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}/.oh-my-zsh/custom"
   register: ohmyzsh_custom_dir
-  become: false
+  become: "{{ desktop_tools_run_as_target }}"
+  become_user: "{{ desktop_tools_target_user }}"
 
 - name: Check for starship binary
   ansible.builtin.command: starship --version
   register: starship_cli_check
   changed_when: false
   failed_when: false
-  become: false
+  become: "{{ desktop_tools_run_as_target }}"
+  become_user: "{{ desktop_tools_target_user }}"
   when: ohmyzsh_custom_dir.stat.exists
 
 - name: Install Starship completions
-  ansible.builtin.shell: "starship completions zsh > {{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom/starship.zsh"
+  ansible.builtin.shell: "starship completions zsh > {{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}/.oh-my-zsh/custom/starship.zsh"
   args:
-    creates: "{{ shell_home | default(ansible_env.HOME) }}/.oh-my-zsh/custom/starship.zsh"
-  become: false
+    creates: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}/.oh-my-zsh/custom/starship.zsh"
+  become: "{{ desktop_tools_run_as_target }}"
+  become_user: "{{ desktop_tools_target_user }}"
   when:
     - ohmyzsh_custom_dir.stat.exists
     - starship_cli_check.rc == 0

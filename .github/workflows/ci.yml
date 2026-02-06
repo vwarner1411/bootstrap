@@ -30,6 +30,30 @@ jobs:
         run: |
           ./tests/smoke.sh
 
+  macos-smoke:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          if [ -x /opt/homebrew/bin/brew ]; then
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+          elif [ -x /usr/local/bin/brew ]; then
+            eval "$(/usr/local/bin/brew shellenv)"
+          fi
+          brew update
+          brew install shellcheck python ansible ansible-lint
+
+      - name: Install Ansible collections
+        run: |
+          ansible-galaxy collection install -r requirements.yml --force
+
+      - name: Run smoke tests
+        run: |
+          ./tests/smoke.sh
+
   bootstrap-e2e:
     runs-on: ubuntu-latest
     needs:
@@ -59,6 +83,8 @@ jobs:
               export PATH="/root/.local/bin:$PATH"
               starship --version
               yazi --version
+              rg --version
+              gpg --version
               ansible-playbook --version
             '
 
@@ -82,4 +108,6 @@ jobs:
               ./scripts/bootstrap.sh
               export PATH="/root/.local/bin:$PATH"
               ls -1 /usr/local/bin
+              rg --version
+              gpg --version
             '

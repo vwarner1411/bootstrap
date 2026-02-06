@@ -2,6 +2,7 @@ macos_cli_brew_packages:
   - curl
   - git
   - jq
+  - gnupg
   - lynx
   - ncdu
   - neovim
@@ -17,6 +18,7 @@ macos_cli_brew_packages:
   - lsd
   - yazi
   - fzf
+  - ripgrep
   - fastfetch
   - yt-dlp
   - ansible

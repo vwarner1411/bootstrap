@@ -47,6 +47,11 @@
     name: []
     update_homebrew: false
     state: present
+  become: "{{ (ansible_facts['user_id'] | default('')) == 'root' }}"
+  become_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root')))) }}"
+  environment:
+    HOME: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}"
+    PATH: "/opt/homebrew/bin:/usr/local/bin:{{ (ansible_facts['env'] | default({})).get('PATH', '/usr/bin:/bin') }}"
   when: ansible_facts.system == "Darwin"
 
 - name: Install core packages with Homebrew (macOS)
@@ -54,4 +59,9 @@
     name: "{{ common_core_brew_packages }}"
     state: latest
     update_homebrew: true
+  become: "{{ (ansible_facts['user_id'] | default('')) == 'root' }}"
+  become_user: "{{ shell_user | default((ansible_facts['env'] | default({})).get('SUDO_USER', (ansible_facts['env'] | default({})).get('USER', ansible_facts['user_id'] | default('root')))) }}"
+  environment:
+    HOME: "{{ shell_home | default((ansible_facts['env'] | default({})).get('HOME', '/var/root')) }}"
+    PATH: "/opt/homebrew/bin:/usr/local/bin:{{ (ansible_facts['env'] | default({})).get('PATH', '/usr/bin:/bin') }}"
   when: ansible_facts.system == "Darwin"

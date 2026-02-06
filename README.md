@@ -9,6 +9,7 @@ Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu toda
 ## Quick Start
 
 Interactive shells (TTY) will prompt for sudo when needed.
+On macOS, run bootstrap as your normal user (do not prepend `sudo`).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vwarner1411/bootstrap/main/scripts/bootstrap.sh | bash
@@ -50,7 +51,7 @@ sudo ~/server-prep.sh
 
 | Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
 |---------------------|-----------------------------------------------|-------------------------------------------------------------------|
-| Core CLI            | git, curl, wget, rsync, jq, ncdu, tree, lynx  | Same set using `apt`, plus python3/pip, build-essential, sysstat  |
+| Core CLI            | git, curl, wget, rsync, jq, gpg, ncdu, tree, lynx, ripgrep | Same set using `apt`/manual install (ripgrep built from source), plus python3/pip, build-essential, sysstat |
 | Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autoupdate, completions, syntax-highlighting) |
 | Prompt/UX           | starship, fastfetch, lsd, yazi, fzf, btop, kitty | Latest GitHub releases for starship, fastfetch, lsd, yazi, fzf, btop, kitty |
 | Development         | neovim, ansible, Powershell, yt-dlp           | Latest GitHub releases for Ansible CLI, PowerShell, yt-dlp        |

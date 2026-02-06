@@ -3,7 +3,7 @@
   gather_facts: true
   become: true
   environment:
-    PATH: "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+    PATH: "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
   vars:
     profile: "{{ profile | default('desktop') }}"
     linux_cli_skip_tools: "{{ ['powershell', 'kitty', 'starship', 'yt-dlp'] if (profile | default('desktop')) == 'server' else [] }}"

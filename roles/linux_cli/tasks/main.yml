@@ -1570,3 +1570,150 @@
   ansible.builtin.debug:
     msg: "yt-dlp version after install: {{ ytdlp_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian" and 'yt-dlp' not in linux_cli_skip_tools
+
+# ripgrep ######################################################################
+- name: Check current ripgrep version
+  ansible.builtin.command: rg --version
+  register: ripgrep_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute existing ripgrep version string
+  ansible.builtin.set_fact:
+    ripgrep_version_pretty: >-
+      {{ (ripgrep_version_check.rc == 0) | ternary((ripgrep_version_check.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest ripgrep release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/BurntSushi/ripgrep/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: bootstrap-ansible
+  register: ripgrep_release
+  retries: 3
+  delay: 2
+  until: ripgrep_release.status == 200
+  when: ansible_facts.os_family == "Debian"
+
+- name: Set ripgrep release facts
+  ansible.builtin.set_fact:
+    ripgrep_release_tag: "{{ ripgrep_release.json.tag_name | default('') }}"
+    ripgrep_target_version: "{{ (ripgrep_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fail if ripgrep release tag is unavailable
+  ansible.builtin.fail:
+    msg: "Unable to determine latest ripgrep release tag."
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_release_tag | length == 0
+
+- name: Determine if ripgrep install is required
+  ansible.builtin.set_fact:
+    ripgrep_install_required: >-
+      {{
+        (ripgrep_release_tag | length > 0) and
+        (
+          (ripgrep_version_check.rc | default(1)) != 0 or
+          (ripgrep_version_check.stdout is defined and ripgrep_target_version not in ripgrep_version_check.stdout)
+        )
+      }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure ripgrep build dependencies are installed
+  ansible.builtin.apt:
+    name:
+      - cargo
+      - rustc
+      - pkg-config
+    state: present
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Set ripgrep build paths
+  ansible.builtin.set_fact:
+    ripgrep_source_archive: "{{ linux_cli_download_dir }}/ripgrep.tar.gz"
+    ripgrep_source_dir: "{{ linux_cli_download_dir }}/ripgrep-{{ ripgrep_release_tag }}"
+  when: ansible_facts.os_family == "Debian"
+
+- name: Download ripgrep source archive
+  ansible.builtin.get_url:
+    url: "https://github.com/BurntSushi/ripgrep/archive/refs/tags/{{ ripgrep_release_tag }}.tar.gz"
+    dest: "{{ ripgrep_source_archive }}"
+    mode: "0644"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Remove previous ripgrep source tree
+  ansible.builtin.file:
+    path: "{{ ripgrep_source_dir }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Unpack ripgrep source archive
+  ansible.builtin.unarchive:
+    src: "{{ ripgrep_source_archive }}"
+    dest: "{{ linux_cli_download_dir }}"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Build ripgrep from source
+  ansible.builtin.command:
+    cmd: cargo build --release --locked
+    chdir: "{{ ripgrep_source_dir }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Install ripgrep binary
+  ansible.builtin.copy:
+    src: "{{ ripgrep_source_dir }}/target/release/rg"
+    dest: /usr/local/bin/rg
+    mode: "0755"
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Remove ripgrep source tree
+  ansible.builtin.file:
+    path: "{{ ripgrep_source_dir }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Clean ripgrep source archive
+  ansible.builtin.file:
+    path: "{{ ripgrep_source_archive }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ripgrep_install_required
+
+- name: Capture ripgrep version after install
+  ansible.builtin.command: rg --version
+  register: ripgrep_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed ripgrep version string
+  ansible.builtin.set_fact:
+    ripgrep_version_post_pretty: >-
+      {{ (ripgrep_version_post.rc == 0) | ternary((ripgrep_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed ripgrep version
+  ansible.builtin.debug:
+    msg: "ripgrep version after install: {{ ripgrep_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
