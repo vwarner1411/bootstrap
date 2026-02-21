@@ -42,6 +42,38 @@
     - /usr/local/lib
   when: ansible_facts.os_family == "Debian"
 
+- name: Check for batcat binary on Debian
+  ansible.builtin.stat:
+    path: /usr/bin/batcat
+  register: common_core_batcat_binary
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure bat symlink exists on Debian
+  ansible.builtin.file:
+    src: /usr/bin/batcat
+    dest: /usr/local/bin/bat
+    state: link
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - common_core_batcat_binary.stat.exists
+
+- name: Check for fdfind binary on Debian
+  ansible.builtin.stat:
+    path: /usr/bin/fdfind
+  register: common_core_fdfind_binary
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure fd symlink exists on Debian
+  ansible.builtin.file:
+    src: /usr/bin/fdfind
+    dest: /usr/local/bin/fd
+    state: link
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - common_core_fdfind_binary.stat.exists
+
 - name: Resolve Homebrew execution context (macOS)
   ansible.builtin.set_fact:
     common_core_macos_brew_target_user: >-
