@@ -1,19 +1,22 @@
 macos_cli_brew_packages:
+  - yt-dlp
+  - ffmpeg
+  - node
+  - chezmoi
+  - zsh-autocomplete
+  - zsh-syntax-highlighting
+  - zsh-autosuggestions
+  - coreutils
   - curl
   - git
   - jq
   - gnupg
   - lynx
   - ncdu
-  - neovim
-  - python
   - rsync
   - tree
   - wget
-  - zsh
-  - coreutils
   - btop
-  - kitty
   - starship
   - lsd
   - yazi
@@ -21,9 +24,10 @@ macos_cli_brew_packages:
   - ripgrep
   - tealdeer
   - fastfetch
-  - yt-dlp
+  - neovim
   - ansible
   - powershell
 
 macos_cli_cask_packages:
-  - iterm2
+  - kitty
+  - font-fira-code
