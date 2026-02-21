@@ -487,6 +487,21 @@ run_chezmoi() {
   run_as_target bash -lc "$chez_cmd"
 }
 
+warm_tealdeer_cache() {
+  detect_target_context
+
+  if run_as_target sh -c "command -v tealdeer >/dev/null 2>&1"; then
+    log "Warming tealdeer cache"
+    run_as_target tealdeer --update >/dev/null 2>&1 || log "Unable to warm tealdeer cache continuing"
+    return
+  fi
+
+  if run_as_target sh -c "command -v tldr >/dev/null 2>&1"; then
+    log "Warming tldr cache"
+    run_as_target tldr --update >/dev/null 2>&1 || log "Unable to warm tldr cache continuing"
+  fi
+}
+
 stage_server_prep_assets() {
   if [ "${PROFILE:-desktop}" != "server" ]; then
     return
@@ -564,6 +579,7 @@ main() {
   install_collections
   run_playbook
   run_chezmoi
+  warm_tealdeer_cache
   stage_server_prep_assets
   log "Bootstrap completed successfully"
 }
