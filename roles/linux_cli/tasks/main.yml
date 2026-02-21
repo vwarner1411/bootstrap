@@ -18,14 +18,33 @@
     state: present
   when: ansible_facts.os_family == "Debian"
 
-# Server profile needs kitty terminfo even when the full client is skipped
-- name: Install kitty terminfo package when kitty binary is omitted
+# Ghostty is preferred as the terminal baseline. Not all Debian releases ship
+# a ghostty package yet, so install when available and continue otherwise.
+- name: Check ghostty package availability
+  ansible.builtin.command: apt-cache show ghostty
+  register: linux_cli_ghostty_package_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+
+- name: Install ghostty package when available
   ansible.builtin.apt:
-    name: kitty-terminfo
+    name: ghostty
     state: present
   when:
     - ansible_facts.os_family == "Debian"
-    - ('kitty' in linux_cli_skip_tools)
+    - ('ghostty' not in linux_cli_skip_tools)
+    - linux_cli_ghostty_package_check.rc == 0
+
+- name: Warn when ghostty package is unavailable
+  ansible.builtin.debug:
+    msg: "Ghostty package is not available on this Debian release. Install it manually if required."
+  when:
+    - ansible_facts.os_family == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+    - linux_cli_ghostty_package_check.rc != 0
 
 - name: Define GitHub download staging directory
   ansible.builtin.set_fact:
@@ -50,6 +69,123 @@
          else 'arm64' if ansible_facts.architecture in ['aarch64', 'arm64']
          else ansible_facts.architecture }}
   when: ansible_facts.os_family == "Debian"
+
+# Hack Nerd Font ##############################################################
+- name: Check whether Hack Nerd Font Mono is already installed
+  ansible.builtin.stat:
+    path: /usr/local/share/fonts/hack-nerd/HackNerdFontMono-Regular.ttf
+  register: linux_cli_hack_nerd_font_file
+  when: ansible_facts.os_family == "Debian"
+
+- name: Fetch latest Nerd Fonts release metadata
+  ansible.builtin.uri:
+    url: https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest
+    return_content: true
+    headers:
+      Accept: application/vnd.github+json
+      User-Agent: bootstrap-ansible
+  register: linux_cli_nerd_fonts_release
+  retries: 3
+  delay: 2
+  until: linux_cli_nerd_fonts_release.status == 200
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+
+- name: Select Hack Nerd Font asset name
+  ansible.builtin.set_fact:
+    linux_cli_hack_nerd_font_asset_name: >-
+      {{
+        (
+          (linux_cli_nerd_fonts_release.json.assets | default([]))
+          | map(attribute='name')
+          | select('equalto', 'Hack.tar.xz')
+          | list
+          | first
+        )
+        | default(
+            (
+              (linux_cli_nerd_fonts_release.json.assets | default([]))
+              | map(attribute='name')
+              | select('equalto', 'Hack.zip')
+              | list
+              | first
+            ),
+            true
+          )
+      }}
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+
+- name: Fail if Hack Nerd Font asset is unavailable
+  ansible.builtin.fail:
+    msg: "Unable to locate Hack Nerd Font asset in the latest nerd-fonts release."
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+    - (linux_cli_hack_nerd_font_asset_name | default('')) == ''
+
+- name: Set Hack Nerd Font asset URL
+  ansible.builtin.set_fact:
+    linux_cli_hack_nerd_font_asset_url: >-
+      {{
+        (
+          linux_cli_nerd_fonts_release.json.assets
+          | selectattr('name', 'equalto', linux_cli_hack_nerd_font_asset_name)
+          | map(attribute='browser_download_url')
+          | list
+          | first
+        )
+        | default('', true)
+      }}
+    linux_cli_hack_nerd_font_archive: "{{ linux_cli_download_dir }}/{{ linux_cli_hack_nerd_font_asset_name }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+
+- name: Download Hack Nerd Font archive
+  ansible.builtin.get_url:
+    url: "{{ linux_cli_hack_nerd_font_asset_url }}"
+    dest: "{{ linux_cli_hack_nerd_font_archive }}"
+    mode: "0644"
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+
+- name: Ensure Hack Nerd Font install directory exists
+  ansible.builtin.file:
+    path: /usr/local/share/fonts/hack-nerd
+    state: directory
+    mode: "0755"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+
+- name: Install Hack Nerd Font files
+  ansible.builtin.unarchive:
+    src: "{{ linux_cli_hack_nerd_font_archive }}"
+    dest: /usr/local/share/fonts/hack-nerd
+    remote_src: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+
+- name: Refresh font cache after Hack Nerd Font install
+  ansible.builtin.command: fc-cache -f /usr/local/share/fonts/hack-nerd
+  changed_when: false
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
+
+- name: Clean Hack Nerd Font archive
+  ansible.builtin.file:
+    path: "{{ linux_cli_hack_nerd_font_archive }}"
+    state: absent
+  when:
+    - ansible_facts.os_family == "Debian"
+    - not linux_cli_hack_nerd_font_file.stat.exists
 
 # PowerShell ###################################################################
 - name: Check current PowerShell version
@@ -147,150 +283,6 @@
   ansible.builtin.debug:
     msg: "PowerShell version after install: {{ linux_cli_powershell_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
-
-# kitty ########################################################################
-- name: Check current kitty version
-  ansible.builtin.command: kitty --version
-  register: linux_cli_kitty_version_check
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Compute existing kitty version string
-  ansible.builtin.set_fact:
-    linux_cli_kitty_version_pretty: >-
-      {{ (linux_cli_kitty_version_check.rc == 0) | ternary((linux_cli_kitty_version_check.stdout | default('') | trim), 'not installed') }}
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Fetch latest kitty release metadata
-  ansible.builtin.uri:
-    url: https://api.github.com/repos/kovidgoyal/kitty/releases/latest
-    return_content: true
-    headers:
-      Accept: application/vnd.github+json
-      User-Agent: bootstrap-ansible
-  register: linux_cli_kitty_release
-  retries: 3
-  delay: 2
-  until: linux_cli_kitty_release.status == 200
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Set kitty release facts
-  ansible.builtin.set_fact:
-    linux_cli_kitty_target_version: "{{ (linux_cli_kitty_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Set kitty asset URL
-  ansible.builtin.set_fact:
-    linux_cli_kitty_asset: >-
-      {{
-        (linux_cli_kitty_release.json.assets | default([]))
-        | selectattr('name', 'equalto', 'kitty-' ~ linux_cli_kitty_target_version ~ '-' ~ linux_cli_arch_cpu ~ '.txz')
-        | map(attribute='browser_download_url')
-        | list
-        | first
-        | default('', true)
-      }}
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-- name: Determine if kitty install is required
-  ansible.builtin.set_fact:
-    linux_cli_kitty_install_required: >-
-      {{
-        (linux_cli_kitty_asset | length > 0) and
-        (
-          (linux_cli_kitty_version_check.rc | default(1)) != 0 or
-          (linux_cli_kitty_version_check.stdout is defined and linux_cli_kitty_target_version not in linux_cli_kitty_version_check.stdout)
-        )
-      }}
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Download kitty release
-  ansible.builtin.get_url:
-    url: "{{ linux_cli_kitty_asset }}"
-    dest: "{{ linux_cli_download_dir }}/kitty.txz"
-    mode: "0644"
-  when:
-    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-    - linux_cli_kitty_install_required
-
-- name: Remove existing kitty version directory
-  ansible.builtin.file:
-    path: "/opt/kitty-{{ linux_cli_kitty_target_version }}"
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-    - linux_cli_kitty_install_required
-
-- name: Create kitty installation directory
-  ansible.builtin.file:
-    path: "/opt/kitty-{{ linux_cli_kitty_target_version }}"
-    state: directory
-    mode: "0755"
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Extract kitty release
-  ansible.builtin.unarchive:
-    src: "{{ linux_cli_download_dir }}/kitty.txz"
-    dest: "/opt/kitty-{{ linux_cli_kitty_target_version }}"
-    remote_src: true
-  when:
-    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-    - linux_cli_kitty_install_required
-
-- name: Ensure kitty binary permissions
-  ansible.builtin.file:
-    path: "/opt/kitty-{{ linux_cli_kitty_target_version }}/bin/kitty"
-    state: file
-    mode: "0755"
-  when:
-    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-    - linux_cli_kitty_install_required
-
-- name: Update kitty current symlink
-  ansible.builtin.file:
-    src: "/opt/kitty-{{ linux_cli_kitty_target_version }}"
-    dest: /opt/kitty
-    state: link
-    force: true
-  when:
-    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-    - linux_cli_kitty_install_required
-
-- name: Ensure kitty symlink exists
-  ansible.builtin.file:
-    src: /opt/kitty/bin/kitty
-    dest: /usr/local/bin/kitty
-    state: link
-    force: true
-  when:
-    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-    - (linux_cli_kitty_version_check.rc | default(1)) == 0 or linux_cli_kitty_install_required
-
-- name: Clean kitty archive
-  ansible.builtin.file:
-    path: "{{ linux_cli_download_dir }}/kitty.txz"
-    state: absent
-  when:
-    - ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-    - linux_cli_kitty_install_required
-
-- name: Capture kitty version after install
-  ansible.builtin.command: kitty --version
-  register: linux_cli_kitty_version_post
-  changed_when: false
-  failed_when: false
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Compute installed kitty version string
-  ansible.builtin.set_fact:
-    linux_cli_kitty_version_post_pretty: >-
-      {{ (linux_cli_kitty_version_post.rc == 0) | ternary((linux_cli_kitty_version_post.stdout | default('') | trim), 'not installed') }}
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
-
-- name: Report installed kitty version
-  ansible.builtin.debug:
-    msg: "Kitty version after install: {{ linux_cli_kitty_version_post_pretty }}"
-  when: ansible_facts.os_family == "Debian" and 'kitty' not in linux_cli_skip_tools
 
 - name: Check current btop version
   ansible.builtin.command: btop --version
@@ -1573,7 +1565,7 @@
 
 # tealdeer #####################################################################
 - name: Check current tealdeer version
-  ansible.builtin.command: tldr --version
+  ansible.builtin.command: tealdeer --version
   register: linux_cli_tealdeer_version_check
   changed_when: false
   failed_when: false
@@ -1714,15 +1706,23 @@
     - ansible_facts.os_family == "Debian"
     - linux_cli_tealdeer_install_required
 
-- name: Install tealdeer binary as tldr
+- name: Install tealdeer binary
   ansible.builtin.copy:
     src: "{{ linux_cli_tealdeer_binary_path }}"
-    dest: /usr/local/bin/tldr
+    dest: /usr/local/bin/tealdeer
     mode: "0755"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_tealdeer_install_required
+
+- name: Ensure tldr compatibility symlink points to tealdeer
+  ansible.builtin.file:
+    src: /usr/local/bin/tealdeer
+    dest: /usr/local/bin/tldr
+    state: link
+    force: true
+  when: ansible_facts.os_family == "Debian"
 
 - name: Clean tealdeer download
   ansible.builtin.file:
@@ -1733,7 +1733,7 @@
     - linux_cli_tealdeer_install_required
 
 - name: Capture tealdeer version after install
-  ansible.builtin.command: tldr --version
+  ansible.builtin.command: tealdeer --version
   register: linux_cli_tealdeer_version_post
   changed_when: false
   failed_when: false
@@ -2006,4 +2006,40 @@
 - name: Report installed ripgrep version
   ansible.builtin.debug:
     msg: "ripgrep version after install: {{ linux_cli_ripgrep_version_post_pretty }}"
+  when: ansible_facts.os_family == "Debian"
+
+# mise #########################################################################
+- name: Check current mise version
+  ansible.builtin.command: mise --version
+  register: linux_cli_mise_version_check
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Install mise via upstream installer when missing
+  ansible.builtin.shell: "curl -fsSL https://mise.run | sh"
+  args:
+    executable: /bin/bash
+  environment:
+    MISE_INSTALL_PATH: /usr/local/bin/mise
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_mise_version_check.rc != 0
+
+- name: Capture mise version after install
+  ansible.builtin.command: mise --version
+  register: linux_cli_mise_version_post
+  changed_when: false
+  failed_when: false
+  when: ansible_facts.os_family == "Debian"
+
+- name: Compute installed mise version string
+  ansible.builtin.set_fact:
+    linux_cli_mise_version_post_pretty: >-
+      {{ (linux_cli_mise_version_post.rc == 0) | ternary((linux_cli_mise_version_post.stdout | default('') | trim), 'not installed') }}
+  when: ansible_facts.os_family == "Debian"
+
+- name: Report installed mise version
+  ansible.builtin.debug:
+    msg: "Mise version after install: {{ linux_cli_mise_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian"
