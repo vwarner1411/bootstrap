@@ -35,6 +35,16 @@
     HOME: "{{ macos_cli_target_home }}"
     PATH: "{{ macos_cli_target_path }}"
 
+- name: Ensure Homebrew fonts tap is installed
+  community.general.homebrew_tap:
+    name: homebrew/cask-fonts
+    state: present
+  become: "{{ (ansible_facts['user_id'] | default('')) == 'root' }}"
+  become_user: "{{ macos_cli_target_user }}"
+  environment:
+    HOME: "{{ macos_cli_target_home }}"
+    PATH: "{{ macos_cli_target_path }}"
+
 - name: Install Homebrew casks for desktop tools
   community.general.homebrew_cask:
     name: "{{ macos_cli_cask_packages }}"
