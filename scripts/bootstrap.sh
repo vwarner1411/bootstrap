@@ -237,6 +237,12 @@ ensure_ansible_macos() {
 
 ensure_chezmoi() {
   detect_target_context
+  local os_id
+  os_id=$(detect_os)
+  if [ "$os_id" = "macos" ]; then
+    log "chezmoi will be installed via Homebrew on macOS"
+    return
+  fi
 
   if run_as_target sh -c "command -v chezmoi >/dev/null 2>&1"; then
     log "chezmoi already installed for ${TARGET_USER}"
@@ -423,8 +429,15 @@ clone_repo() {
 
 run_chezmoi() {
   detect_target_context
-  local chez_cmd init_cmd init_repo repo_path_literal
-  chez_cmd="export PATH=\"\$HOME/.local/bin:\$PATH\";"
+  local chez_cmd init_cmd init_repo repo_path_literal brew_path=""
+  if [ "$(detect_os)" = "macos" ]; then
+    if [ -d /opt/homebrew/bin ]; then
+      brew_path="/opt/homebrew/bin"
+    elif [ -d /usr/local/bin ]; then
+      brew_path="/usr/local/bin"
+    fi
+  fi
+  chez_cmd="export PATH=\"\$HOME/.local/bin${brew_path:+:${brew_path}}:\$PATH\";"
   chez_cmd+=" if chezmoi git -- status >/dev/null 2>&1; then"
   chez_cmd+="   echo '[chezmoi] Updating existing state' >&2;"
   chez_cmd+="   branch=\"\$(chezmoi git -- rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')\";"
