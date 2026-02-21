@@ -25,4 +25,5 @@ common_core_debian_packages:
   - iftop
   - unzip
   - fontconfig
+  - fonts-firacode
   - pipx
