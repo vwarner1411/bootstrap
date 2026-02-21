@@ -22,7 +22,7 @@ Environment variables:
 - `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
 - `ANSIBLE_EXTRA_VARS` (optional raw `--extra-vars` payload for advanced overrides)
 
-The `server` profile skips desktop niceties (`powershell`, `kitty`, `starship`, `yt-dlp`) while still installing the core CLI stack.
+The `server` profile skips desktop niceties (`powershell`, `ghostty`, `starship`, `yt-dlp`) while still installing the core CLI stack.
 
 Example one-liners:
 
@@ -52,13 +52,13 @@ sudo ~/server-prep.sh
 
 | Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
 |---------------------|-----------------------------------------------|-------------------------------------------------------------------|
-| Core CLI            | git, curl, wget, rsync, jq, gpg, ncdu, tree, lynx, ripgrep, tealdeer | Same set using `apt`/manual install (ripgrep from GitHub releases), plus python3/pip, build-essential, sysstat |
+| Core CLI            | git, curl, wget, rsync, jq, gpg, ncdu, tree, lynx, ripgrep, tealdeer, aria2, mosh | Same set using `apt`/manual install (ripgrep from GitHub releases), plus python3/pip, build-essential, sysstat |
 | Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autoupdate, completions, syntax-highlighting) |
-| Prompt/UX           | starship, fastfetch, lsd, yazi, fzf, btop, kitty | Latest GitHub releases for starship, fastfetch, lsd, yazi, fzf, btop, kitty |
-| Development         | neovim, ansible, Powershell, yt-dlp           | Latest GitHub releases for Ansible CLI, PowerShell, yt-dlp        |
+| Prompt/UX           | starship, fastfetch, lsd, yazi, fzf, btop, ghostty, Hack Nerd Font | Latest GitHub releases for starship, fastfetch, lsd, yazi, fzf, btop plus Hack Nerd Font from nerd-fonts releases; Ghostty via `apt` when available |
+| Development         | neovim, ansible, Powershell, yt-dlp, mise     | Latest GitHub releases for Ansible CLI, PowerShell, yt-dlp, mise   |
 | Dotfiles            | Managed via `chezmoi init --apply`            | Same dotfiles source                                              |
 
-Linux nodes never rely on Homebrew; developer tooling comes straight from GitHub releases (apt is only used for core OS/build dependencies).
+Linux nodes never rely on Homebrew; most developer tooling comes from GitHub releases (apt is used for core OS/build dependencies and distro-packaged tools when appropriate).
 
 ## Project Layout
 
