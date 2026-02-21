@@ -240,7 +240,18 @@ ensure_chezmoi() {
   local os_id
   os_id=$(detect_os)
   if [ "$os_id" = "macos" ]; then
-    log "chezmoi will be installed via Homebrew on macOS"
+    if command_exists chezmoi; then
+      log "chezmoi already installed on macOS"
+      return
+    fi
+
+    if ! command_exists brew; then
+      err "homebrew is required to install chezmoi on macOS"
+      exit 1
+    fi
+
+    log "Installing chezmoi with Homebrew"
+    brew install chezmoi
     return
   fi
 
