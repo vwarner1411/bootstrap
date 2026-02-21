@@ -1,5 +1,6 @@
 macos_cli_brew_packages:
   - yt-dlp
+  - aria2
   - ffmpeg
   - node
   - chezmoi
@@ -11,6 +12,7 @@ macos_cli_brew_packages:
   - git
   - jq
   - gnupg
+  - mosh
   - lynx
   - ncdu
   - rsync
@@ -27,7 +29,12 @@ macos_cli_brew_packages:
   - neovim
   - ansible
   - powershell
+  - bat
+  - fd
+  - tmux
+  - zoxide
+  - mise
 
 macos_cli_cask_packages:
-  - kitty
-  - font-fira-code
+  - ghostty
+  - font-hack-nerd-font
