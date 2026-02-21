@@ -2016,12 +2016,32 @@
   failed_when: false
   when: ansible_facts.os_family == "Debian"
 
+- name: Download mise installer script when missing
+  ansible.builtin.get_url:
+    url: https://mise.run
+    dest: "{{ linux_cli_download_dir }}/mise-install.sh"
+    mode: "0755"
+    force: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_mise_version_check.rc != 0
+
 - name: Install mise via upstream installer when missing
-  ansible.builtin.shell: "curl -fsSL https://mise.run | sh"
-  args:
-    executable: /bin/bash
+  ansible.builtin.command:
+    argv:
+      - /bin/bash
+      - "{{ linux_cli_download_dir }}/mise-install.sh"
   environment:
     MISE_INSTALL_PATH: /usr/local/bin/mise
+  changed_when: true
+  when:
+    - ansible_facts.os_family == "Debian"
+    - linux_cli_mise_version_check.rc != 0
+
+- name: Clean mise installer script
+  ansible.builtin.file:
+    path: "{{ linux_cli_download_dir }}/mise-install.sh"
+    state: absent
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_mise_version_check.rc != 0
