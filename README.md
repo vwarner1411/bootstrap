@@ -1,92 +1,163 @@
 # Bootstrap Environment
 
-Reusable bootstrap for macOS desktops and Debian-based workstations (Ubuntu today, Debian/Arch next). The repo delivers:
+Reusable bootstrap for macOS desktops and Debian-based Linux workstations (Ubuntu and Debian) with a consistent terminal-first setup.
 
-- A single `curl` entrypoint that installs prerequisites, syncs `chezmoi` dotfiles, and applies Ansible roles.
-- Ansible playbooks/roles for idempotent package management without Homebrew on Linux.
-- Tests to guard syntax, linting, and shell quality.
+The repo provides:
+
+- A single `curl` entrypoint that installs prerequisites, ensures `chezmoi`, runs Ansible roles, and applies dotfiles.
+- Idempotent package management: Homebrew on macOS, `apt` + upstream release installs on Linux.
+- A profile-aware flow (`desktop` or `server`) so workstation and server hosts can share one bootstrap path.
 
 ## Quick Start
 
-Interactive shells (TTY) will prompt for sudo when needed.
-On macOS, run bootstrap as your normal user (do not prepend `sudo`).
+Run from an interactive shell. On macOS, run as your normal user (do not prepend `sudo`).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vwarner1411/bootstrap/main/scripts/bootstrap.sh | bash
 ```
 
-Environment variables:
+### Supported environment variables
 
-- `PROFILE=server|desktop` (default `desktop`)
-- `REPO_BRANCH` (defaults to `main`)
-- `CHEZMOI_REPO` (defaults to `https://github.com/vwarner1411/dotfiles.git`)
-- `ANSIBLE_EXTRA_VARS` (optional raw `--extra-vars` payload for advanced overrides)
+- `PROFILE=desktop|server` (default `desktop`)
+- `REPO_URL` (defaults to `https://github.com/vwarner1411/bootstrap.git`)
+- `REPO_BRANCH` (default `main`)
+- `CHEZMOI_REPO` (default `https://github.com/vwarner1411/dotfiles.git`)
+- `WORKDIR` (default `$HOME/.local/share/bootstrap`)
+- `ANSIBLE_EXTRA_VARS` (optional raw `--extra-vars` payload)
 
-The `server` profile skips desktop niceties (`powershell`, `ghostty`, `starship`, `yt-dlp`) while still installing the core CLI stack.
-
-Example one-liners:
+Example:
 
 ```bash
-# Desktop workstation
 PROFILE=desktop CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/bootstrap/main/scripts/bootstrap.sh)"
-
-# Server baseline
-PROFILE=server CHEZMOI_REPO=https://github.com/vwarner1411/dotfiles.git \
   bash -c "$(curl -fsSL https://raw.githubusercontent.com/vwarner1411/bootstrap/main/scripts/bootstrap.sh)"
 ```
 
-Re-run the same command any time to upgrade packages and reapply dotfiles.
+Re-running bootstrap is expected and safe; it upgrades/reconciles tools and reapplies dotfiles.
+
+## Profiles
+
+- `desktop`:
+  - Full terminal UX stack and desktop-oriented CLI tooling.
+- `server`:
+  - Skips `powershell`, `ghostty`, `starship`, and `yt-dlp`.
+  - Installs `open-vm-tools` on Debian-family hosts.
+  - Stages `~/server-prep.sh` for post-provision hardening.
+
+## What Gets Installed
+
+### macOS (Homebrew formulas)
+
+`yt-dlp`, `aria2`, `ffmpeg`, `node`, `chezmoi`, `zsh-autocomplete`, `zsh-syntax-highlighting`, `zsh-autosuggestions`, `coreutils`, `curl`, `git`, `jq`, `gnupg`, `mosh`, `lynx`, `ncdu`, `rsync`, `tree`, `wget`, `btop`, `starship`, `lsd`, `yazi`, `fzf`, `ripgrep`, `tealdeer`, `fastfetch`, `neovim`, `ansible`, `powershell`, `bat`, `fd`, `tmux`, `zoxide`, `mise`.
+
+### macOS (Homebrew casks)
+
+`ghostty`, `font-hack-nerd-font`.
+
+### Debian/Ubuntu core packages (`apt`)
+
+`apt-transport-https`, `aria2`, `build-essential`, `ca-certificates`, `curl`, `git`, `gnupg`, `lynx`, `mosh`, `ncdu`, `neovim`, `nfs-common`, `plocate`, `python3`, `python3-pip`, `python3-venv`, `rsync`, `software-properties-common`, `ssh`, `tree`, `wget`, `zsh`, `ddate`, `sysstat`, `iotop`, `iftop`, `unzip`, `fontconfig`, `fonts-hack`, `pipx`, `bat`, `fd-find`, `tmux`, `zoxide`.
+
+Plus Linux task prerequisites: `ncurses-term`, `xz-utils`, `bzip2`, `tar`.
+
+### Debian/Ubuntu tools installed from upstream releases
+
+- `powershell`
+- `btop`
+- `lsd`
+- `fzf`
+- `fastfetch`
+- `starship`
+- `yazi`
+- `yt-dlp`
+- `tealdeer`
+- `ripgrep`
+- `mise`
+- Hack Nerd Font Mono (latest Nerd Fonts release)
+
+Additional Linux behavior:
+
+- Attempts `apt install ghostty` when available in host repos.
+- Ensures `bat` and `fd` compatibility symlinks (`batcat -> bat`, `fdfind -> fd`).
+- Creates a Linux `tldr` compatibility command by linking `tldr` to `tealdeer`.
+
+## Package Replacements and Defaults
+
+The bootstrap now standardizes on the following terminal tooling choices:
+
+- `lsd` is the supported `ls` replacement (not `eza`).
+- `tealdeer` is the supported TLDR client (not `tldr` package).
+- `ghostty` is the default terminal target.
+- Hack Nerd Font is the default font baseline.
+
+## Shell and Prompt Setup
+
+- Installs Oh My Zsh.
+- Installs Zsh plugins:
+  - `autoupdate`
+  - `zsh-autosuggestions`
+  - `zsh-completions`
+  - `zsh-syntax-highlighting`
+- Installs Starship Zsh completions when desktop profile and Starship are present.
+
+## Dotfiles Apply Flow
+
+After Ansible completes, bootstrap:
+
+- Initializes or updates `chezmoi` state from `CHEZMOI_REPO`.
+- Applies dotfiles with force semantics.
+- Warms command help cache:
+  - `tealdeer --update` when available.
+  - Falls back to `tldr --update` if tealdeer is not present.
 
 ## Server Prep Script
 
-When the server profile is bootstrapped, a helper script `~/server-prep.sh` is staged (with the playbook stored under `~/.local/share/bootstrap/server_prep/`). Run it manually to harden a VM before turning it into a template—it prompts for hostname and static networking, disables cloud-init, refreshes SSH host keys, applies the requested sysctl values, scrubs logs/history, and reboots when finished.
+When `PROFILE=server`, bootstrap stages:
+
+- `~/.local/share/bootstrap/server_prep/server_prep.yml`
+- `~/.local/share/bootstrap/server_prep/templates/server-prep-netplan.yaml.j2`
+- `~/.local/share/bootstrap/server_prep/server-prep.sh`
+- Symlink: `~/server-prep.sh`
+
+Run it after bootstrap to harden a server template:
 
 ```bash
 sudo ~/server-prep.sh
 ```
 
-> Supported on Ubuntu Server 22.04/24.04. The playbook will ask for the new hostname, IP details, and confirmation before rebooting.
-
-## What Gets Installed
-
-| Area                | macOS (Homebrew)                              | Ubuntu/Debian (apt/manual)                                        |
-|---------------------|-----------------------------------------------|-------------------------------------------------------------------|
-| Core CLI            | git, curl, wget, rsync, jq, gpg, ncdu, tree, lynx, ripgrep, tealdeer, aria2, mosh | Same set using `apt`/manual install (ripgrep from GitHub releases), plus python3/pip, build-essential, sysstat |
-| Shell tooling       | zsh, Oh My Zsh, autosuggestions, completions  | zsh via apt, plugins cloned from GitHub (oh-my-zsh, autosuggestions, autoupdate, completions, syntax-highlighting) |
-| Prompt/UX           | starship, fastfetch, lsd, yazi, fzf, btop, ghostty, Hack Nerd Font | Latest GitHub releases for starship, fastfetch, lsd, yazi, fzf, btop plus Hack Nerd Font from nerd-fonts releases; Ghostty via `apt` when available |
-| Development         | neovim, ansible, Powershell, yt-dlp, mise     | Latest GitHub releases for Ansible CLI, PowerShell, yt-dlp, mise   |
-| Dotfiles            | Managed via `chezmoi init --apply`            | Same dotfiles source                                              |
-
-Linux nodes never rely on Homebrew; most developer tooling comes from GitHub releases (apt is used for core OS/build dependencies and distro-packaged tools when appropriate).
+It prompts for hostname and static network details, then performs cleanup/hardening and reboots.
 
 ## Project Layout
 
-```
+```text
 ├── ansible.cfg
 ├── inventory/hosts.yml
-├── playbooks/bootstrap.yml
+├── playbooks/
+│   ├── bootstrap.yml
+│   ├── server_prep.yml
+│   └── templates/server-prep-netplan.yaml.j2
 ├── requirements.yml
 ├── roles/
-│   ├── common_core/        # shared baseline
-│   ├── linux_cli/          # GitHub releases + minimal apt build deps
-│   ├── macos_cli/          # Homebrew formulas/casks
-│   ├── shell_extras/       # oh-my-zsh and plugins
-│   └── desktop_tools/      # desktop-only extras
-├── scripts/bootstrap.sh    # curl-able entrypoint
-└── tests/smoke.sh          # syntax/lint/shellcheck
+│   ├── common_core/
+│   ├── linux_cli/
+│   ├── macos_cli/
+│   ├── shell_extras/
+│   └── desktop_tools/
+├── scripts/
+│   ├── bootstrap.sh
+│   └── server-prep.sh
+└── tests/
+    └── smoke.sh
 ```
 
-## Running Manually
+## Run Manually
 
 ```bash
-# assumes repo cloned to ~/src/bootstrap
 cd ~/src/bootstrap
 ansible-galaxy collection install -r requirements.yml --force
 ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop" --ask-become-pass
 ```
 
-Switch to server profile:
+Server profile:
 
 ```bash
 ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server" --ask-become-pass
@@ -94,25 +165,24 @@ ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server" --ask-bec
 
 ## Tests
 
-Use the smoke script to validate changes before committing:
+Run smoke checks before committing:
 
 ```bash
 ./tests/smoke.sh
 ```
 
-- `ansible-playbook --syntax-check`
-- `ansible-lint` (if present)
-- `shellcheck` for the bootstrap script
+Current smoke checks include:
 
-Add Molecule or CI workflows later without changing the bootstrap flow.
+- `ansible-playbook --syntax-check`
+- `ansible-lint` (when installed)
+- `shellcheck` on bootstrap script
 
 ## Roadmap
 
-- Debian + Arch inventory groups
-- Additional Molecule scenarios
-- Optional GUI packages gated by tags
-- Cached release lookup for air-gapped installs
+- Arch inventory/group support
+- Expanded e2e coverage
+- Optional GUI bundles via tags
 
 ## License
 
-MIT – reuse and adapt as needed. Pull requests welcome.
+MIT
