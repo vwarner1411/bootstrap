@@ -194,20 +194,10 @@ ensure_prereqs_macos() {
 }
 
 ensure_ansible_linux() {
-  local latest_tag
-  latest_tag="$(github_latest_tag "ansible/ansible" | tr -d '\n')"
-  local latest_clean="${latest_tag#v}"
-  local current_version=""
-  if command_exists ansible; then
-    current_version="$(ansible --version 2>/dev/null | awk 'NR==1 {print $2}' | sed 's/^v//')"
-  fi
-  if [ -n "$current_version" ] && [ "$current_version" = "$latest_clean" ]; then
-    log "Ansible ${latest_clean} already installed"
-    return
-  fi
-
   local venv_dir="$HOME/.local/share/ansible-venv"
   local bin_dir="$HOME/.local/bin"
+  local python_version python_major python_minor
+  local latest_tag latest_clean current_version
   ensure_directory "$bin_dir"
   ensure_directory "$venv_dir"
 
@@ -215,14 +205,42 @@ ensure_ansible_linux() {
     python3 -m venv "$venv_dir"
   fi
 
+  python_version="$("$venv_dir/bin/python" - <<'PY'
+import sys
+print(f"{sys.version_info.major}.{sys.version_info.minor}")
+PY
+  )"
+  python_major="${python_version%%.*}"
+  python_minor="${python_version#*.}"
+
   "$venv_dir/bin/python" -m pip install --upgrade pip setuptools wheel
-  "$venv_dir/bin/python" -m pip install --upgrade "https://github.com/ansible/ansible/archive/refs/tags/${latest_tag}.tar.gz"
+
+  if [ "$python_major" -gt 3 ] || { [ "$python_major" -eq 3 ] && [ "$python_minor" -ge 12 ]; }; then
+    latest_tag="$(github_latest_tag "ansible/ansible" | tr -d '\n')"
+    latest_clean="${latest_tag#v}"
+    current_version=""
+    if command_exists ansible; then
+      current_version="$(
+        ansible --version 2>/dev/null \
+          | awk 'NR==1 {for (i=1; i<=NF; i++) if ($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) {gsub(/[^0-9.]/, "", $i); print $i; exit}}'
+      )"
+    fi
+    if [ -n "$current_version" ] && [ "$current_version" = "$latest_clean" ]; then
+      log "Ansible ${latest_clean} already installed"
+    elif "$venv_dir/bin/python" -m pip install --upgrade "https://github.com/ansible/ansible/archive/refs/tags/${latest_tag}.tar.gz"; then
+      log "Installed Ansible ${latest_clean} from GitHub releases"
+    else
+      log "Latest Ansible install failed; installing latest compatible ansible-core from PyPI"
+      "$venv_dir/bin/python" -m pip install --upgrade ansible-core
+    fi
+  else
+    log "Python ${python_version} detected; installing latest compatible ansible-core from PyPI"
+    "$venv_dir/bin/python" -m pip install --upgrade ansible-core
+  fi
 
   for tool in ansible ansible-playbook ansible-galaxy ansible-config; do
     ln -sf "$venv_dir/bin/$tool" "$bin_dir/$tool"
   done
-
-  log "Installed Ansible ${latest_clean} from GitHub releases"
 }
 
 ensure_ansible_macos() {
