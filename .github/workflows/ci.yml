@@ -30,6 +30,30 @@ jobs:
         run: |
           ./tests/smoke.sh
 
+  debian-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run smoke tests inside Debian container
+        run: |
+          docker run --rm \
+            -v "$PWD":/workspace \
+            debian:12 \
+            bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y shellcheck git python3 python3-pip python3-venv ca-certificates
+              cd /workspace
+              python3 -m venv /tmp/.venv-ci
+              . /tmp/.venv-ci/bin/activate
+              python -m pip install --upgrade pip
+              pip install ansible-core ansible-lint
+              ./tests/smoke.sh
+            '
+
   macos-smoke:
     runs-on: macos-latest
     steps:
@@ -130,6 +154,64 @@ jobs:
             -e WORKDIR="/root/.local/share/zshell" \
             -e PROFILE="server" \
             ubuntu:24.04 \
+            bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y sudo curl git python3 python3-pip python3-venv ca-certificates
+              mkdir -p /root
+              export HOME=/root
+              cd /workspace
+              ./scripts/bootstrap.sh
+              export PATH="/root/.local/bin:$PATH"
+              ls -1 /usr/local/bin
+              rg --version
+              gpg --version
+            '
+
+  debian-e2e:
+    runs-on: ubuntu-latest
+    needs:
+      - debian-smoke
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run bootstrap script inside Debian container (desktop)
+        run: |
+          docker run --rm \
+            -v "$PWD":/workspace \
+            -e REPO_URL="file:///workspace" \
+            -e CHEZMOI_REPO="/workspace/tests/fixtures/chezmoi" \
+            -e WORKDIR="/root/.local/share/zshell" \
+            -e PROFILE="desktop" \
+            debian:12 \
+            bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y sudo curl git python3 python3-pip python3-venv ca-certificates
+              mkdir -p /root
+              export HOME=/root
+              cd /workspace
+              ./scripts/bootstrap.sh
+              export PATH="/root/.local/bin:$PATH"
+              starship --version
+              yazi --version
+              rg --version
+              gpg --version
+              ansible-playbook --version
+            '
+
+      - name: Run bootstrap script inside Debian container (server)
+        run: |
+          docker run --rm \
+            -v "$PWD":/workspace \
+            -e REPO_URL="file:///workspace" \
+            -e CHEZMOI_REPO="/workspace/tests/fixtures/chezmoi" \
+            -e WORKDIR="/root/.local/share/zshell" \
+            -e PROFILE="server" \
+            debian:12 \
             bash -lc '
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive
