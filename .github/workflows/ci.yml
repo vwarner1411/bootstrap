@@ -139,6 +139,12 @@ jobs:
               ./scripts/bootstrap.sh
               export PATH="/root/.local/bin:$PATH"
               ghostty --version
+              nvim --version | head -n1
+              NVIM_VERSION="$(nvim --version | awk '\''NR==1 {print $2}'\'' | sed '\''s/^v//'\'')"
+              if [ "$(printf "%s\n" "0.11.2" "$NVIM_VERSION" | sort -V | head -n1)" != "0.11.2" ]; then
+                echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
+                exit 1
+              fi
               starship --version
               yazi --version
               rg --version
@@ -166,6 +172,12 @@ jobs:
               ./scripts/bootstrap.sh
               export PATH="/root/.local/bin:$PATH"
               ghostty --version
+              nvim --version | head -n1
+              NVIM_VERSION="$(nvim --version | awk '\''NR==1 {print $2}'\'' | sed '\''s/^v//'\'')"
+              if [ "$(printf "%s\n" "0.11.2" "$NVIM_VERSION" | sort -V | head -n1)" != "0.11.2" ]; then
+                echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
+                exit 1
+              fi
               starship --version
               ls -1 /usr/local/bin
               rg --version
@@ -200,6 +212,12 @@ jobs:
               ./scripts/bootstrap.sh
               export PATH="/root/.local/bin:$PATH"
               dpkg -s ghostty >/dev/null
+              nvim --version | head -n1
+              NVIM_VERSION="$(nvim --version | awk '\''NR==1 {print $2}'\'' | sed '\''s/^v//'\'')"
+              if [ "$(printf "%s\n" "0.11.2" "$NVIM_VERSION" | sort -V | head -n1)" != "0.11.2" ]; then
+                echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
+                exit 1
+              fi
               starship --version
               yazi --version
               rg --version
@@ -227,6 +245,12 @@ jobs:
               ./scripts/bootstrap.sh
               export PATH="/root/.local/bin:$PATH"
               dpkg -s ghostty >/dev/null
+              nvim --version | head -n1
+              NVIM_VERSION="$(nvim --version | awk '\''NR==1 {print $2}'\'' | sed '\''s/^v//'\'')"
+              if [ "$(printf "%s\n" "0.11.2" "$NVIM_VERSION" | sort -V | head -n1)" != "0.11.2" ]; then
+                echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
+                exit 1
+              fi
               starship --version
               ls -1 /usr/local/bin
               rg --version

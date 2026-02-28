@@ -9,7 +9,6 @@ common_core_debian_packages:
   - lynx
   - mosh
   - ncdu
-  - neovim
   - nfs-common
   - plocate
   - python3

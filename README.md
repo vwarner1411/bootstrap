@@ -55,7 +55,7 @@ Re-running bootstrap is expected and safe; it upgrades/reconciles tools and reap
 
 ### Debian/Ubuntu core packages (`apt`)
 
-`apt-transport-https`, `aria2`, `build-essential`, `ca-certificates`, `curl`, `git`, `gnupg`, `lynx`, `mosh`, `ncdu`, `neovim`, `nfs-common`, `plocate`, `python3`, `python3-pip`, `python3-venv`, `rsync`, `ssh`, `tree`, `wget`, `zsh`, `ddate`, `sysstat`, `iotop`, `iftop`, `unzip`, `fontconfig`, `fonts-hack`, `pipx`, `bat`, `fd-find`, `tmux`, `zoxide`.
+`apt-transport-https`, `aria2`, `build-essential`, `ca-certificates`, `curl`, `git`, `gnupg`, `lynx`, `mosh`, `ncdu`, `nfs-common`, `plocate`, `python3`, `python3-pip`, `python3-venv`, `rsync`, `ssh`, `tree`, `wget`, `zsh`, `ddate`, `sysstat`, `iotop`, `iftop`, `unzip`, `fontconfig`, `fonts-hack`, `pipx`, `bat`, `fd-find`, `tmux`, `zoxide`.
 
 Plus Linux task prerequisites: `ncurses-term`, `xz-utils`, `bzip2`, `tar`.
 
@@ -68,6 +68,7 @@ Plus Linux task prerequisites: `ncurses-term`, `xz-utils`, `bzip2`, `tar`.
 - `fastfetch`
 - `starship`
 - `yazi`
+- `neovim`
 - `yt-dlp`
 - `tealdeer`
 - `ripgrep`
