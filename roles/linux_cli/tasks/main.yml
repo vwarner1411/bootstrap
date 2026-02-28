@@ -18,33 +18,89 @@
     state: present
   when: ansible_facts.os_family == "Debian"
 
-# Ghostty is preferred as the terminal baseline. Not all Debian releases ship
-# a ghostty package yet, so install when available and continue otherwise.
-- name: Check ghostty package availability
-  ansible.builtin.command: apt-cache show ghostty
-  register: linux_cli_ghostty_package_check
-  changed_when: false
-  failed_when: false
+# Ghostty is required on Debian hosts. Configure the Debian-specific apt source
+# before package installation so the package is resolvable.
+- name: Set Ghostty Debian repository facts
+  ansible.builtin.set_fact:
+    linux_cli_ghostty_repo_key_url: https://debian.griffo.io/EA0F721D231FDD3A0A17B9AC7808B4DD62C41256.asc
+    linux_cli_ghostty_repo_key_asc_path: /tmp/debian.griffo.io.asc
+    linux_cli_ghostty_repo_keyring_path: /etc/apt/trusted.gpg.d/debian.griffo.io.gpg
+    linux_cli_ghostty_repo_list_path: /etc/apt/sources.list.d/debian.griffo.io.list
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Debian"
     - ('ghostty' not in linux_cli_skip_tools)
 
-- name: Install ghostty package when available
+- name: Ensure Debian codename is available for Ghostty repository
+  ansible.builtin.fail:
+    msg: "Unable to determine Debian codename for Ghostty repository configuration."
+  when:
+    - ansible_facts.distribution == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+    - (ansible_facts.distribution_release | default('') | trim) == ''
+
+- name: Check existing Ghostty Debian repository keyring
+  ansible.builtin.stat:
+    path: "{{ linux_cli_ghostty_repo_keyring_path }}"
+  register: linux_cli_ghostty_repo_keyring_stat
+  when:
+    - ansible_facts.distribution == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+
+- name: Download Ghostty Debian repository key
+  ansible.builtin.get_url:
+    url: "{{ linux_cli_ghostty_repo_key_url }}"
+    dest: "{{ linux_cli_ghostty_repo_key_asc_path }}"
+    mode: "0644"
+    force: true
+  register: linux_cli_ghostty_repo_key_download
+  when:
+    - ansible_facts.distribution == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+
+- name: Install Ghostty Debian repository keyring
+  ansible.builtin.command:
+    argv:
+      - gpg
+      - --dearmor
+      - --yes
+      - -o
+      - "{{ linux_cli_ghostty_repo_keyring_path }}"
+      - "{{ linux_cli_ghostty_repo_key_asc_path }}"
+  register: linux_cli_ghostty_repo_key_dearmor
+  changed_when: true
+  when:
+    - ansible_facts.distribution == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+    - linux_cli_ghostty_repo_key_download.changed or not linux_cli_ghostty_repo_keyring_stat.stat.exists
+
+- name: Configure Ghostty Debian repository source list
+  ansible.builtin.copy:
+    dest: "{{ linux_cli_ghostty_repo_list_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "deb https://debian.griffo.io/apt {{ ansible_facts.distribution_release }} main\n"
+  register: linux_cli_ghostty_repo_list
+  when:
+    - ansible_facts.distribution == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+
+- name: Refresh apt cache after Ghostty Debian repository changes
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 0
+  when:
+    - ansible_facts.distribution == "Debian"
+    - ('ghostty' not in linux_cli_skip_tools)
+    - linux_cli_ghostty_repo_list.changed or (linux_cli_ghostty_repo_key_dearmor is defined and linux_cli_ghostty_repo_key_dearmor.changed)
+
+- name: Ensure ghostty package is installed on Debian
   ansible.builtin.apt:
     name: ghostty
     state: present
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Debian"
     - ('ghostty' not in linux_cli_skip_tools)
-    - linux_cli_ghostty_package_check.rc == 0
-
-- name: Warn when ghostty package is unavailable
-  ansible.builtin.debug:
-    msg: "Ghostty package is not available on this Debian release. Install it manually if required."
-  when:
-    - ansible_facts.os_family == "Debian"
-    - ('ghostty' not in linux_cli_skip_tools)
-    - linux_cli_ghostty_package_check.rc != 0
 
 - name: Define GitHub download staging directory
   ansible.builtin.set_fact:

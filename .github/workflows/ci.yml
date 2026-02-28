@@ -196,6 +196,7 @@ jobs:
               cd /workspace
               ./scripts/bootstrap.sh
               export PATH="/root/.local/bin:$PATH"
+              dpkg -s ghostty >/dev/null
               starship --version
               yazi --version
               rg --version
@@ -222,6 +223,7 @@ jobs:
               cd /workspace
               ./scripts/bootstrap.sh
               export PATH="/root/.local/bin:$PATH"
+              dpkg -s ghostty >/dev/null
               ls -1 /usr/local/bin
               rg --version
               gpg --version
