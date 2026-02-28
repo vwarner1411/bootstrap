@@ -62,6 +62,41 @@
     shell_extras_zshrc_dir: "{{ shell_extras_target_home }}/.zshrc.d"
   become: false
 
+- name: Resolve zsh binary path on Debian-family hosts
+  ansible.builtin.command: command -v zsh
+  register: shell_extras_zsh_path
+  changed_when: false
+  failed_when: shell_extras_zsh_path.rc != 0
+  when: ansible_facts.os_family == "Debian"
+
+- name: Ensure zsh appears in /etc/shells
+  ansible.builtin.lineinfile:
+    path: /etc/shells
+    line: "{{ shell_extras_zsh_path.stdout | trim }}"
+    state: present
+  when:
+    - ansible_facts.os_family == "Debian"
+    - (shell_extras_zsh_path.stdout | default('') | trim) != ''
+
+- name: Lookup target user passwd entry
+  ansible.builtin.command: getent passwd "{{ shell_extras_target_user }}"
+  register: shell_extras_target_passwd_entry
+  changed_when: false
+  failed_when: shell_extras_target_passwd_entry.rc != 0
+  when:
+    - ansible_facts.os_family == "Debian"
+    - shell_extras_target_user != 'root'
+
+- name: Set target user's default shell to zsh
+  ansible.builtin.user:
+    name: "{{ shell_extras_target_user }}"
+    shell: "{{ shell_extras_zsh_path.stdout | trim }}"
+  when:
+    - ansible_facts.os_family == "Debian"
+    - shell_extras_target_user != 'root'
+    - (shell_extras_zsh_path.stdout | default('') | trim) != ''
+    - shell_extras_target_passwd_entry.stdout.split(':')[-1] | trim != shell_extras_zsh_path.stdout | trim
+
 - name: Determine if shell extras tasks should switch user
   ansible.builtin.set_fact:
     shell_extras_run_as_target: "{{ (ansible_facts['user_id'] | default('')) == 'root' and shell_extras_target_user != 'root' }}"
