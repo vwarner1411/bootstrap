@@ -40,7 +40,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD":/workspace \
-            debian:12 \
+            debian:13 \
             bash -lc '
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive
@@ -185,7 +185,7 @@ jobs:
             -e CHEZMOI_REPO="/workspace/tests/fixtures/chezmoi" \
             -e WORKDIR="/root/.local/share/zshell" \
             -e PROFILE="desktop" \
-            debian:12 \
+            debian:13 \
             bash -lc '
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive
@@ -211,7 +211,7 @@ jobs:
             -e CHEZMOI_REPO="/workspace/tests/fixtures/chezmoi" \
             -e WORKDIR="/root/.local/share/zshell" \
             -e PROFILE="server" \
-            debian:12 \
+            debian:13 \
             bash -lc '
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive

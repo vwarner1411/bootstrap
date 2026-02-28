@@ -16,7 +16,6 @@ common_core_debian_packages:
   - python3-pip
   - python3-venv
   - rsync
-  - software-properties-common
   - ssh
   - tree
   - wget

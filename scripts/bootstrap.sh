@@ -138,8 +138,7 @@ ensure_prereqs_linux() {
     rsync \
     python3 \
     python3-pip \
-    python3-venv \
-    software-properties-common
+    python3-venv
 }
 
 github_latest_tag() {
