@@ -63,7 +63,9 @@
   become: false
 
 - name: Resolve zsh binary path on Debian-family hosts
-  ansible.builtin.command: command -v zsh
+  ansible.builtin.shell: command -v zsh
+  args:
+    executable: /bin/bash
   register: shell_extras_zsh_path
   changed_when: false
   failed_when: shell_extras_zsh_path.rc != 0
