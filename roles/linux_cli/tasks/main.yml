@@ -1323,7 +1323,7 @@
           | list
           | unique
           | map('regex_replace', '^', 'yazi-')
-          | map('regex_replace', '$', '-unknown-linux-gnu.zip')
+          | map('regex_replace', '$', '-unknown-linux-musl.zip')
           | list
         )
         +
@@ -1333,7 +1333,7 @@
           | list
           | unique
           | map('regex_replace', '^', 'yazi-')
-          | map('regex_replace', '$', '-unknown-linux-musl.zip')
+          | map('regex_replace', '$', '-unknown-linux-gnu.zip')
           | list
         )
       }}
