@@ -39,7 +39,7 @@ Re-running bootstrap is expected and safe; it upgrades/reconciles tools and reap
 - `desktop`:
   - Full terminal UX stack and desktop-oriented CLI tooling.
 - `server`:
-  - Skips `powershell`, `starship`, and `yt-dlp`.
+  - Skips `powershell` and `yt-dlp`.
   - Installs `open-vm-tools` on Debian-family hosts.
   - Stages `~/server-prep.sh` for post-provision hardening.
 
@@ -77,6 +77,7 @@ Plus Linux task prerequisites: `ncurses-term`, `xz-utils`, `bzip2`, `tar`.
 Additional Linux behavior:
 
 - On Debian hosts, configures `debian.griffo.io` apt source/key and installs `ghostty`.
+- On Ubuntu hosts, runs the `mkasberg/ghostty-ubuntu` installer and verifies `ghostty` is present.
 - Ensures `bat` and `fd` compatibility symlinks (`batcat -> bat`, `fdfind -> fd`).
 - Creates a Linux `tldr` compatibility command by linking `tldr` to `tealdeer`.
 

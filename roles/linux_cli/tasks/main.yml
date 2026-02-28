@@ -102,6 +102,38 @@
     - ansible_facts.distribution == "Debian"
     - ('ghostty' not in linux_cli_skip_tools)
 
+- name: Check current ghostty version on Ubuntu
+  ansible.builtin.command: ghostty --version
+  register: linux_cli_ghostty_ubuntu_version_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts.distribution == "Ubuntu"
+    - ('ghostty' not in linux_cli_skip_tools)
+
+- name: Install ghostty on Ubuntu via mkasberg installer
+  ansible.builtin.command:
+    argv:
+      - /bin/bash
+      - -c
+      - "$(curl -fsSL https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh)"
+  changed_when: true
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+  when:
+    - ansible_facts.distribution == "Ubuntu"
+    - ('ghostty' not in linux_cli_skip_tools)
+    - linux_cli_ghostty_ubuntu_version_check.rc != 0
+
+- name: Verify ghostty is installed on Ubuntu
+  ansible.builtin.command: ghostty --version
+  register: linux_cli_ghostty_ubuntu_version_post
+  changed_when: false
+  failed_when: linux_cli_ghostty_ubuntu_version_post.rc != 0
+  when:
+    - ansible_facts.distribution == "Ubuntu"
+    - ('ghostty' not in linux_cli_skip_tools)
+
 - name: Define GitHub download staging directory
   ansible.builtin.set_fact:
     linux_cli_download_dir: /tmp/bootstrap-github-downloads
