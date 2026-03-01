@@ -593,252 +593,75 @@
     linux_cli_btop_target_version: "{{ (linux_cli_btop_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
   when: ansible_facts.os_family == "Debian"
 
-- name: Build btop architecture token list
+- name: Determine btop asset name
   ansible.builtin.set_fact:
-    linux_cli_btop_arch_tokens: >-
-      {{
-        (
-          ['x86_64', 'amd64', 'x64'] if linux_cli_arch_cpu == 'x86_64'
-          else ['aarch64', 'arm64'] if linux_cli_arch_cpu == 'aarch64'
-          else [linux_cli_arch_cpu]
-        ) | unique
-      }}
+    linux_cli_btop_asset_name: >-
+      {{ {'x86_64': 'btop-x86_64-linux-musl.tbz', 'aarch64': 'btop-aarch64-linux-musl.tbz'}.get(linux_cli_arch_cpu, '') }}
   when: ansible_facts.os_family == "Debian"
-
-- name: Build btop asset candidate list
-  ansible.builtin.set_fact:
-    linux_cli_btop_asset_candidates: >-
-      {{
-        (
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux-musl.tbz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux-musl.tar.xz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux-musl.tar.gz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux-gnu.tbz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux-gnu.tar.xz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux-gnu.tar.gz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux.tbz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux.tar.xz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-')
-            | map('regex_replace', '$', '-linux.tar.gz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-linux-')
-            | map('regex_replace', '$', '.tbz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-linux-')
-            | map('regex_replace', '$', '.tar.xz')
-            | list
-          )
-          +
-          (
-            linux_cli_btop_arch_tokens
-            | map('regex_replace', '^', 'btop-linux-')
-            | map('regex_replace', '$', '.tar.gz')
-            | list
-          )
-        ) | unique
-      }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set btop available assets
-  ansible.builtin.set_fact:
-    linux_cli_btop_available_assets: "{{ linux_cli_btop_release.json.assets | default([]) | map(attribute='name') | list }}"
-  when: ansible_facts.os_family == "Debian"
-
-- name: Initialize btop asset name
-  ansible.builtin.set_fact:
-    linux_cli_btop_asset_name: ""
-  when: ansible_facts.os_family == "Debian"
-
-- name: Select btop asset candidate
-  ansible.builtin.set_fact:
-    linux_cli_btop_asset_name: "{{ item }}"
-  loop: "{{ linux_cli_btop_asset_candidates }}"
-  loop_control:
-    label: "{{ item }}"
-  when:
-    - ansible_facts.os_family == "Debian"
-    - (linux_cli_btop_asset_name | default('')) == ""
-    - item in linux_cli_btop_available_assets
 
 - name: Set btop asset URL
   ansible.builtin.set_fact:
     linux_cli_btop_asset: >-
       {{
         (linux_cli_btop_release.json.assets | default([]))
-        | selectattr('name', 'equalto', linux_cli_btop_asset_name)
+        | selectattr('name', 'equalto', linux_cli_btop_asset_name | default(''))
         | map(attribute='browser_download_url')
         | list
         | first
         | default('', true)
       }}
   when: ansible_facts.os_family == "Debian"
-
-- name: Fail if no btop asset found
-  ansible.builtin.fail:
-    msg: >-
-      No matching btop release asset found for arch {{ linux_cli_arch_cpu }}
-      (version {{ linux_cli_btop_target_version }}). Candidates:
-      {{ linux_cli_btop_asset_candidates | join(', ') }}
-  when:
-    - ansible_facts.os_family == "Debian"
-    - linux_cli_btop_asset | length == 0
-
 - name: Determine if btop install is required
   ansible.builtin.set_fact:
     linux_cli_btop_install_required: >-
       {{
-        (linux_cli_btop_version_check.rc | default(1)) != 0 or
-        (linux_cli_btop_version_check.stdout is defined and linux_cli_btop_target_version not in linux_cli_btop_version_check.stdout)
+        (linux_cli_btop_asset | length > 0) and
+        (
+          (linux_cli_btop_version_check.rc | default(1)) != 0 or
+          (linux_cli_btop_version_check.stdout is defined and linux_cli_btop_target_version not in linux_cli_btop_version_check.stdout)
+        )
       }}
-  when: ansible_facts.os_family == "Debian"
-
-- name: Set btop download and extract paths
-  ansible.builtin.set_fact:
-    linux_cli_btop_archive_path: "{{ linux_cli_download_dir }}/{{ linux_cli_btop_asset_name }}"
-    linux_cli_btop_extract_dir: "{{ linux_cli_download_dir }}/btop_extract"
   when: ansible_facts.os_family == "Debian"
 
 - name: Download btop release
   ansible.builtin.get_url:
     url: "{{ linux_cli_btop_asset }}"
-    dest: "{{ linux_cli_btop_archive_path }}"
+    dest: "{{ linux_cli_download_dir }}/btop.tbz"
     mode: "0644"
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_btop_install_required
 
-- name: Remove previous btop extract directory
+- name: Remove previous btop build directory
   ansible.builtin.file:
-    path: "{{ linux_cli_btop_extract_dir }}"
+    path: "{{ linux_cli_download_dir }}/btop"
     state: absent
-  when:
-    - ansible_facts.os_family == "Debian"
-    - linux_cli_btop_install_required
-
-- name: Ensure btop extract directory exists
-  ansible.builtin.file:
-    path: "{{ linux_cli_btop_extract_dir }}"
-    state: directory
-    mode: "0755"
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_btop_install_required
 
 - name: Unpack btop release
   ansible.builtin.unarchive:
-    src: "{{ linux_cli_btop_archive_path }}"
-    dest: "{{ linux_cli_btop_extract_dir }}"
+    src: "{{ linux_cli_download_dir }}/btop.tbz"
+    dest: "{{ linux_cli_download_dir }}"
     remote_src: true
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_btop_install_required
 
-- name: Locate btop source directory
-  ansible.builtin.find:
-    paths: "{{ linux_cli_btop_extract_dir }}"
-    patterns: Makefile
-    recurse: true
-    file_type: file
-  register: linux_cli_btop_makefiles
-  when:
-    - ansible_facts.os_family == "Debian"
-    - linux_cli_btop_install_required
-
-- name: Set btop source directory
-  ansible.builtin.set_fact:
-    linux_cli_btop_source_dir: >-
-      {{
-        (
-          linux_cli_btop_makefiles.files
-          | map(attribute='path')
-          | map('dirname')
-          | list
-          | first
-          | default('')
-        )
-      }}
-  when:
-    - ansible_facts.os_family == "Debian"
-    - linux_cli_btop_install_required
-
-- name: Fail if btop source directory was not found
-  ansible.builtin.fail:
-    msg: >-
-      Unable to locate btop build source directory in archive {{ linux_cli_btop_asset_name }}.
-  when:
-    - ansible_facts.os_family == "Debian"
-    - linux_cli_btop_install_required
-    - (linux_cli_btop_source_dir | default('')) == ''
-
 - name: Install btop
   ansible.builtin.command:
     cmd: make install PREFIX=/usr/local
-    chdir: "{{ linux_cli_btop_source_dir }}"
+    chdir: "{{ linux_cli_download_dir }}/btop"
+  args:
+    creates: /usr/local/bin/btop
   when:
     - ansible_facts.os_family == "Debian"
     - linux_cli_btop_install_required
 
-- name: Remove btop extract directory
+- name: Remove btop build directory
   ansible.builtin.file:
-    path: "{{ linux_cli_btop_extract_dir }}"
+    path: "{{ linux_cli_download_dir }}/btop"
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
@@ -846,7 +669,7 @@
 
 - name: Clean btop archive
   ansible.builtin.file:
-    path: "{{ linux_cli_btop_archive_path }}"
+    path: "{{ linux_cli_download_dir }}/btop.tbz"
     state: absent
   when:
     - ansible_facts.os_family == "Debian"
@@ -858,14 +681,6 @@
   changed_when: false
   failed_when: false
   when: ansible_facts.os_family == "Debian"
-
-- name: Fail if btop install was required but btop is unavailable
-  ansible.builtin.fail:
-    msg: "btop installation was required, but btop is still unavailable after installation."
-  when:
-    - ansible_facts.os_family == "Debian"
-    - linux_cli_btop_install_required
-    - (linux_cli_btop_version_post.rc | default(1)) != 0
 
 - name: Compute installed btop version string
   ansible.builtin.set_fact:
