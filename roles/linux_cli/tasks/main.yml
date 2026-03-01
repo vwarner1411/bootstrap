@@ -562,20 +562,26 @@
     msg: "PowerShell version after install: {{ linux_cli_powershell_version_post_pretty }}"
   when: ansible_facts.os_family == "Debian" and 'powershell' not in linux_cli_skip_tools
 
-- name: Check current btop version
+- name: Ensure btop package is installed on Debian
+  ansible.builtin.apt:
+    name: btop
+    state: present
+  when: ansible_facts.distribution == "Debian"
+
+- name: Check current btop version on Ubuntu
   ansible.builtin.command: btop --version
   register: linux_cli_btop_version_check
   changed_when: false
   failed_when: false
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Compute existing btop version string
+- name: Compute existing btop version string on Ubuntu
   ansible.builtin.set_fact:
     linux_cli_btop_version_pretty: >-
       {{ (linux_cli_btop_version_check.rc == 0) | ternary((linux_cli_btop_version_check.stdout | default('') | trim), 'not installed') }}
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Fetch latest btop release metadata
+- name: Fetch latest btop release metadata on Ubuntu
   ansible.builtin.uri:
     url: https://api.github.com/repos/aristocratos/btop/releases/latest
     return_content: true
@@ -586,20 +592,20 @@
   retries: 3
   delay: 2
   until: linux_cli_btop_release.status == 200
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Set btop release facts
+- name: Set btop release facts on Ubuntu
   ansible.builtin.set_fact:
     linux_cli_btop_target_version: "{{ (linux_cli_btop_release.json.tag_name | default('')) | regex_replace('^v', '') }}"
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Determine btop asset name
+- name: Determine btop asset name on Ubuntu
   ansible.builtin.set_fact:
     linux_cli_btop_asset_name: >-
       {{ {'x86_64': 'btop-x86_64-linux-musl.tbz', 'aarch64': 'btop-aarch64-linux-musl.tbz'}.get(linux_cli_arch_cpu, '') }}
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Set btop asset URL
+- name: Set btop asset URL on Ubuntu
   ansible.builtin.set_fact:
     linux_cli_btop_asset: >-
       {{
@@ -610,8 +616,9 @@
         | first
         | default('', true)
       }}
-  when: ansible_facts.os_family == "Debian"
-- name: Determine if btop install is required
+  when: ansible_facts.distribution == "Ubuntu"
+
+- name: Determine if btop install is required on Ubuntu
   ansible.builtin.set_fact:
     linux_cli_btop_install_required: >-
       {{
@@ -621,77 +628,77 @@
           (linux_cli_btop_version_check.stdout is defined and linux_cli_btop_target_version not in linux_cli_btop_version_check.stdout)
         )
       }}
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Download btop release
+- name: Download btop release on Ubuntu
   ansible.builtin.get_url:
     url: "{{ linux_cli_btop_asset }}"
     dest: "{{ linux_cli_download_dir }}/btop.tbz"
     mode: "0644"
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
     - linux_cli_btop_install_required
 
-- name: Remove previous btop build directory
+- name: Remove previous btop build directory on Ubuntu
   ansible.builtin.file:
     path: "{{ linux_cli_download_dir }}/btop"
     state: absent
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
     - linux_cli_btop_install_required
 
-- name: Unpack btop release
+- name: Unpack btop release on Ubuntu
   ansible.builtin.unarchive:
     src: "{{ linux_cli_download_dir }}/btop.tbz"
     dest: "{{ linux_cli_download_dir }}"
     remote_src: true
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
     - linux_cli_btop_install_required
 
-- name: Install btop
+- name: Install btop on Ubuntu
   ansible.builtin.command:
     cmd: make install PREFIX=/usr/local
     chdir: "{{ linux_cli_download_dir }}/btop"
   args:
     creates: /usr/local/bin/btop
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
     - linux_cli_btop_install_required
 
-- name: Remove btop build directory
+- name: Remove btop build directory on Ubuntu
   ansible.builtin.file:
     path: "{{ linux_cli_download_dir }}/btop"
     state: absent
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
     - linux_cli_btop_install_required
 
-- name: Clean btop archive
+- name: Clean btop archive on Ubuntu
   ansible.builtin.file:
     path: "{{ linux_cli_download_dir }}/btop.tbz"
     state: absent
   when:
-    - ansible_facts.os_family == "Debian"
+    - ansible_facts.distribution == "Ubuntu"
     - linux_cli_btop_install_required
 
-- name: Capture btop version after install
+- name: Capture btop version after install on Ubuntu
   ansible.builtin.command: btop --version
   register: linux_cli_btop_version_post
   changed_when: false
   failed_when: false
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Compute installed btop version string
+- name: Compute installed btop version string on Ubuntu
   ansible.builtin.set_fact:
     linux_cli_btop_version_post_pretty: >-
       {{ (linux_cli_btop_version_post.rc == 0) | ternary((linux_cli_btop_version_post.stdout | default('') | trim), 'not installed') }}
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
-- name: Report installed btop version
+- name: Report installed btop version on Ubuntu
   ansible.builtin.debug:
     msg: "Btop version after install: {{ linux_cli_btop_version_post_pretty }}"
-  when: ansible_facts.os_family == "Debian"
+  when: ansible_facts.distribution == "Ubuntu"
 
 - name: Check current lsd version
   ansible.builtin.command: lsd --version
