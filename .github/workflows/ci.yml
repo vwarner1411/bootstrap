@@ -145,6 +145,7 @@ jobs:
                 echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
                 exit 1
               fi
+              btop --version
               starship --version
               yazi --version
               rg --version
@@ -178,6 +179,7 @@ jobs:
                 echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
                 exit 1
               fi
+              btop --version
               starship --version
               ls -1 /usr/local/bin
               rg --version
@@ -218,6 +220,7 @@ jobs:
                 echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
                 exit 1
               fi
+              btop --version
               starship --version
               yazi --version
               rg --version
@@ -251,6 +254,7 @@ jobs:
                 echo "Neovim version ${NVIM_VERSION} is below required 0.11.2"
                 exit 1
               fi
+              btop --version
               starship --version
               ls -1 /usr/local/bin
               rg --version
