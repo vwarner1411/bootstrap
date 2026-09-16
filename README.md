@@ -181,12 +181,17 @@ neither of Ansible's escalation paths works against sudo-rs:
 
 Ansible's fix (PR #86175) is in `devel` only; the stable backports were reverted.
 
-`scripts/bootstrap.sh` handles this automatically: it uses passwordless sudo if
-already configured, otherwise points Ansible at original sudo when both are
-installed, and otherwise installs a `NOPASSWD` rule in `/etc/sudoers.d` for the
-duration of the run, removing it on exit and sweeping any grant left behind by a
-run that was killed. To run the playbook by hand on sudo-rs, arrange passwordless
-sudo for yourself first and drop `--ask-become-pass`.
+Ubuntu still ships the original binary as `/usr/bin/sudo.ws`, but it is not the
+configured sudo and cannot authenticate: it rejects every password with `Sorry,
+try again`. It is not a usable escape hatch.
+
+`scripts/bootstrap.sh` handles this automatically. It uses passwordless sudo if
+that is already configured; otherwise it lets Ansible prompt when the system sudo
+is the original implementation (macOS, Debian, Ubuntu up to 25.04); otherwise it
+installs a `NOPASSWD` rule in `/etc/sudoers.d` for the duration of the run,
+removing it on exit and sweeping any grant left behind by a run that was killed.
+To run the playbook by hand on sudo-rs, arrange passwordless sudo for yourself
+first and drop `--ask-become-pass`.
 
 ## Tests
 

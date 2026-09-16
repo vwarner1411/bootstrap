@@ -595,18 +595,13 @@ sudo_passwordless_without_tty() {
 }
 
 # Original sudo reports "Sudo version ..."; sudo-rs reports "sudo-rs ...".
-# Where both are installed, pointing Ansible at the original needs no
-# system-wide change.
-classic_sudo_path() {
-  local candidate
-  for candidate in /usr/bin/sudo.ws /usr/local/bin/sudo /usr/bin/sudo; do
-    [ -x "$candidate" ] || continue
-    if "$candidate" --version 2>/dev/null | head -n 1 | grep -qi 'sudo version'; then
-      printf '%s' "$candidate"
-      return 0
-    fi
-  done
-  return 1
+# Only the system's configured sudo counts. Ubuntu 25.10+ still ships the
+# original binary as /usr/bin/sudo.ws while alternatives point sudo at sudo-rs,
+# but that leftover binary is not wired up for authentication and rejects every
+# password with "Sorry, try again", so it is not a usable escape hatch.
+default_sudo_is_original() {
+  command_exists sudo || return 1
+  sudo --version 2>/dev/null | head -n 1 | grep -qi 'sudo version'
 }
 
 # A run killed outright cannot fire the trap, so sweep before deciding anything.
@@ -643,7 +638,7 @@ grant_temporary_nopasswd() {
 }
 
 arrange_become() {
-  local sudoers_file classic_sudo
+  local sudoers_file
   sudoers_file="$(bootstrap_sudoers_file)"
   discard_stale_nopasswd "$sudoers_file"
 
@@ -651,9 +646,8 @@ arrange_become() {
     log "sudo is already passwordless; Ansible will escalate directly"
     return 0
   fi
-  if classic_sudo="$(classic_sudo_path)"; then
-    log "Using ${classic_sudo} for Ansible privilege escalation"
-    export ANSIBLE_BECOME_EXE="$classic_sudo"
+  if default_sudo_is_original; then
+    log "System sudo is the original implementation; Ansible can prompt for it"
     return 2
   fi
   grant_temporary_nopasswd "$sudoers_file"
