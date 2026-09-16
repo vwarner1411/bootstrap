@@ -153,17 +153,28 @@ It prompts for hostname and static network details, then performs cleanup/harden
 
 ## Run Manually
 
+Authenticate sudo first and let Ansible escalate with the cached credentials.
+Do not use `--ask-become-pass`: Ubuntu 25.10 and later ship sudo-rs, which
+rewrites the `-p` prompt Ansible looks for, so the run stalls and fails with
+`Timed out waiting for become success or become password prompt`.
+
 ```bash
 cd ~/src/bootstrap
 ansible-galaxy collection install -r requirements.yml --force
-ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop" --ask-become-pass
+sudo -v
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop"
 ```
 
 Server profile:
 
 ```bash
-ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server" --ask-become-pass
+sudo -v
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server"
 ```
+
+Long runs can outlive the sudo timestamp (15 minutes by default). `scripts/bootstrap.sh`
+refreshes it automatically; when running the playbook by hand, re-run `sudo -v` if
+escalation starts failing partway through.
 
 ## Tests
 

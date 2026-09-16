@@ -26,6 +26,8 @@ WORKDIR="${WORKDIR:-$HOME/.local/share/bootstrap}"
 PROFILE="${PROFILE:-desktop}"
 ANSIBLE_EXTRA_VARS="${ANSIBLE_EXTRA_VARS:-}"
 
+SUDO_KEEPALIVE_PID=""
+
 TARGET_USER="${TARGET_USER_OVERRIDE:-}"
 TARGET_HOME="${TARGET_HOME_OVERRIDE:-}"
 
@@ -551,6 +553,43 @@ install_collections() {
   ansible-galaxy collection install -r "$WORKDIR/requirements.yml" --force -p "$WORKDIR/collections"
 }
 
+sudo_keepalive_stop() {
+  if [ -n "$SUDO_KEEPALIVE_PID" ]; then
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    SUDO_KEEPALIVE_PID=""
+  fi
+}
+
+trap sudo_keepalive_stop EXIT INT TERM
+
+# Ansible only hands sudo a custom "-p" prompt when it is carrying a become
+# password. sudo-rs (the default sudo since Ubuntu 25.10) wraps that prompt as
+# "[sudo: <prompt>] Password:" instead of replacing the prompt outright, so the
+# startswith() match in Ansible's become plugin never fires and the run dies
+# with "Timed out waiting for become success or become password prompt".
+# Authenticating here keeps Ansible on its passwordless "sudo -n" path, which
+# both sudo implementations treat identically.
+prime_sudo() {
+  command_exists sudo || return 1
+  if sudo -n true 2>/dev/null; then
+    return 0
+  fi
+  [ -t 0 ] || return 1
+  log "Requesting sudo credentials for the Ansible run"
+  sudo -v || return 1
+  # Ansible escalates with "sudo -n", so the credentials must actually cache.
+  sudo -n true 2>/dev/null
+}
+
+sudo_keepalive_start() {
+  sudo_keepalive_stop
+  while true; do
+    sudo -n true 2>/dev/null || break
+    sleep 60
+  done &
+  SUDO_KEEPALIVE_PID=$!
+}
+
 run_playbook() {
   pushd "$WORKDIR" >/dev/null
   detect_target_context
@@ -560,11 +599,20 @@ run_playbook() {
   if [ -n "$ANSIBLE_EXTRA_VARS" ]; then
     cmd+=(--extra-vars "$ANSIBLE_EXTRA_VARS")
   fi
-  if [ "$EUID" -ne 0 ] && [ -t 0 ]; then
-    cmd+=(--ask-become-pass)
+  if [ "$EUID" -ne 0 ]; then
+    if prime_sudo; then
+      sudo_keepalive_start
+    elif [ -t 0 ]; then
+      log "sudo credentials are not cacheable; falling back to Ansible's become prompt"
+      cmd+=(--ask-become-pass)
+    else
+      err "Unable to obtain sudo credentials; the bootstrap playbook needs root privileges."
+      exit 1
+    fi
   fi
   log "Running Ansible playbook"
   "${cmd[@]}"
+  sudo_keepalive_stop
   popd >/dev/null
 }
 
