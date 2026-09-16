@@ -26,7 +26,7 @@ WORKDIR="${WORKDIR:-$HOME/.local/share/bootstrap}"
 PROFILE="${PROFILE:-desktop}"
 ANSIBLE_EXTRA_VARS="${ANSIBLE_EXTRA_VARS:-}"
 
-SUDO_KEEPALIVE_PID=""
+SUDO_NOPASSWD_FILE=""
 
 TARGET_USER="${TARGET_USER_OVERRIDE:-}"
 TARGET_HOME="${TARGET_HOME_OVERRIDE:-}"
@@ -553,41 +553,110 @@ install_collections() {
   ansible-galaxy collection install -r "$WORKDIR/requirements.yml" --force -p "$WORKDIR/collections"
 }
 
-sudo_keepalive_stop() {
-  if [ -n "$SUDO_KEEPALIVE_PID" ]; then
-    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
-    SUDO_KEEPALIVE_PID=""
+bootstrap_sudoers_file() {
+  local user safe_user
+  user="$(id -un)"
+  safe_user="${user//[^A-Za-z0-9_-]/-}"
+  printf '/etc/sudoers.d/99-bootstrap-%s' "$safe_user"
+}
+
+sudoers_grant_cleanup() {
+  if [ -n "$SUDO_NOPASSWD_FILE" ]; then
+    sudo -n rm -f "$SUDO_NOPASSWD_FILE" 2>/dev/null || true
+    SUDO_NOPASSWD_FILE=""
   fi
 }
 
-trap sudo_keepalive_stop EXIT INT TERM
+trap sudoers_grant_cleanup EXIT INT TERM
 
-# Ansible only hands sudo a custom "-p" prompt when it is carrying a become
-# password. sudo-rs (the default sudo since Ubuntu 25.10) wraps that prompt as
-# "[sudo: <prompt>] Password:" instead of replacing the prompt outright, so the
-# startswith() match in Ansible's become plugin never fires and the run dies
-# with "Timed out waiting for become success or become password prompt".
-# Authenticating here keeps Ansible on its passwordless "sudo -n" path, which
-# both sudo implementations treat identically.
-prime_sudo() {
-  command_exists sudo || return 1
-  if sudo -n true 2>/dev/null; then
+# Privilege escalation for Ansible has to be arranged before the run, because
+# neither of Ansible's own paths works against sudo-rs (the default sudo since
+# Ubuntu 25.10):
+#
+#   * --ask-become-pass fails because Ansible passes sudo a custom "-p" prompt
+#     and matches it with startswith(). Original sudo replaces the prompt with
+#     that string; sudo-rs wraps it as "[sudo: <prompt>] Password:", so the
+#     match never fires and the run dies with "Timed out waiting for become
+#     success or become password prompt".
+#   * Cached credentials fail because Ansible runs every task in a worker that
+#     calls setsid(), leaving the task with no controlling terminal. sudo-rs
+#     keeps a separate credential record per terminal and supports neither
+#     timestamp_type nor tty_tickets, so a "sudo -v" on the login terminal is
+#     invisible to Ansible and escalation fails with "sudo: interactive
+#     authentication is required".
+#
+# Ansible's own fix for the prompt (PR #86175) is in devel only; the stable
+# backports were reverted. So probe what this machine can actually do.
+
+# Passwordless already, even with no controlling terminal: nothing to arrange.
+sudo_passwordless_without_tty() {
+  command_exists setsid || return 1
+  setsid --wait sudo -n true >/dev/null 2>&1
+}
+
+# Original sudo reports "Sudo version ..."; sudo-rs reports "sudo-rs ...".
+# Where both are installed, pointing Ansible at the original needs no
+# system-wide change.
+classic_sudo_path() {
+  local candidate
+  for candidate in /usr/bin/sudo.ws /usr/local/bin/sudo /usr/bin/sudo; do
+    [ -x "$candidate" ] || continue
+    if "$candidate" --version 2>/dev/null | head -n 1 | grep -qi 'sudo version'; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# A run killed outright cannot fire the trap, so sweep before deciding anything.
+discard_stale_nopasswd() {
+  local file="$1"
+  if sudo -n test -e "$file" 2>/dev/null; then
+    log "Removing a passwordless sudo grant left behind by an earlier run"
+    sudo -n rm -f "$file" 2>/dev/null || true
+  fi
+}
+
+grant_temporary_nopasswd() {
+  local file="$1" user tmp
+  user="$(id -un)"
+  # The name is interpolated into a sudoers rule, so accept only plain names.
+  if ! printf '%s' "$user" | grep -Eq '^[A-Za-z_][A-Za-z0-9_-]*$'; then
+    err "Refusing to write a sudoers rule for unexpected username: ${user}"
+    return 1
+  fi
+  tmp="$(mktemp)"
+  printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$user" > "$tmp"
+  if command_exists visudo && ! sudo visudo -cf "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    err "Generated sudoers snippet failed validation; refusing to install it."
+    return 1
+  fi
+  if ! sudo install -m 0440 -o root -g root "$tmp" "$file"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  rm -f "$tmp"
+  SUDO_NOPASSWD_FILE="$file"
+  log "Granted ${user} passwordless sudo for the duration of this run (${file})"
+}
+
+arrange_become() {
+  local sudoers_file classic_sudo
+  sudoers_file="$(bootstrap_sudoers_file)"
+  discard_stale_nopasswd "$sudoers_file"
+
+  if sudo_passwordless_without_tty; then
+    log "sudo is already passwordless; Ansible will escalate directly"
     return 0
   fi
-  [ -t 0 ] || return 1
-  log "Requesting sudo credentials for the Ansible run"
-  sudo -v || return 1
-  # Ansible escalates with "sudo -n", so the credentials must actually cache.
-  sudo -n true 2>/dev/null
-}
-
-sudo_keepalive_start() {
-  sudo_keepalive_stop
-  while true; do
-    sudo -n true 2>/dev/null || break
-    sleep 60
-  done &
-  SUDO_KEEPALIVE_PID=$!
+  if classic_sudo="$(classic_sudo_path)"; then
+    log "Using ${classic_sudo} for Ansible privilege escalation"
+    export ANSIBLE_BECOME_EXE="$classic_sudo"
+    return 2
+  fi
+  grant_temporary_nopasswd "$sudoers_file"
 }
 
 run_playbook() {
@@ -600,19 +669,20 @@ run_playbook() {
     cmd+=(--extra-vars "$ANSIBLE_EXTRA_VARS")
   fi
   if [ "$EUID" -ne 0 ]; then
-    if prime_sudo; then
-      sudo_keepalive_start
-    elif [ -t 0 ]; then
-      log "sudo credentials are not cacheable; falling back to Ansible's become prompt"
-      cmd+=(--ask-become-pass)
-    else
-      err "Unable to obtain sudo credentials; the bootstrap playbook needs root privileges."
-      exit 1
-    fi
+    local become_rc=0
+    arrange_become || become_rc=$?
+    case "$become_rc" in
+      0) ;;
+      2) cmd+=(--ask-become-pass) ;;
+      *)
+        err "Unable to arrange privilege escalation for Ansible."
+        exit 1
+        ;;
+    esac
   fi
   log "Running Ansible playbook"
   "${cmd[@]}"
-  sudo_keepalive_stop
+  sudoers_grant_cleanup
   popd >/dev/null
 }
 

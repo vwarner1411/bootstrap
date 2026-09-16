@@ -153,28 +153,40 @@ It prompts for hostname and static network details, then performs cleanup/harden
 
 ## Run Manually
 
-Authenticate sudo first and let Ansible escalate with the cached credentials.
-Do not use `--ask-become-pass`: Ubuntu 25.10 and later ship sudo-rs, which
-rewrites the `-p` prompt Ansible looks for, so the run stalls and fails with
-`Timed out waiting for become success or become password prompt`.
-
 ```bash
 cd ~/src/bootstrap
 ansible-galaxy collection install -r requirements.yml --force
-sudo -v
-ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop"
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=desktop" --ask-become-pass
 ```
 
 Server profile:
 
 ```bash
-sudo -v
-ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server"
+ansible-playbook playbooks/bootstrap.yml --extra-vars "profile=server" --ask-become-pass
 ```
 
-Long runs can outlive the sudo timestamp (15 minutes by default). `scripts/bootstrap.sh`
-refreshes it automatically; when running the playbook by hand, re-run `sudo -v` if
-escalation starts failing partway through.
+### Privilege escalation on Ubuntu 25.10 and later
+
+Those commands assume original sudo. Ubuntu 25.10 replaced it with sudo-rs, and
+neither of Ansible's escalation paths works against sudo-rs:
+
+- `--ask-become-pass` fails with `Timed out waiting for become success or become
+  password prompt`. Ansible passes sudo a custom `-p` prompt and matches it with
+  `startswith()`; original sudo replaces the prompt with that string, but sudo-rs
+  wraps it as `[sudo: <prompt>] Password:`.
+- Pre-authenticating with `sudo -v` fails with `sudo: interactive authentication
+  is required`. Ansible runs each task in a worker that calls `setsid()`, so the
+  task has no controlling terminal, and sudo-rs keeps a separate credential
+  record per terminal with no `timestamp_type` or `tty_tickets` to widen it.
+
+Ansible's fix (PR #86175) is in `devel` only; the stable backports were reverted.
+
+`scripts/bootstrap.sh` handles this automatically: it uses passwordless sudo if
+already configured, otherwise points Ansible at original sudo when both are
+installed, and otherwise installs a `NOPASSWD` rule in `/etc/sudoers.d` for the
+duration of the run, removing it on exit and sweeping any grant left behind by a
+run that was killed. To run the playbook by hand on sudo-rs, arrange passwordless
+sudo for yourself first and drop `--ask-become-pass`.
 
 ## Tests
 
