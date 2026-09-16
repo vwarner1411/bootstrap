@@ -647,8 +647,15 @@ arrange_become() {
     return 0
   fi
   if default_sudo_is_original; then
-    log "System sudo is the original implementation; Ansible can prompt for it"
-    return 2
+    # Ansible can prompt for original sudo, but only with a terminal to prompt
+    # on. Without one (CI), fall through unprompted and let passwordless sudo
+    # carry the run, which is what this script did before it grew this probe.
+    if [ -t 0 ]; then
+      log "System sudo is the original implementation; Ansible can prompt for it"
+      return 2
+    fi
+    log "No terminal to prompt on; relying on passwordless sudo"
+    return 0
   fi
   grant_temporary_nopasswd "$sudoers_file"
 }
