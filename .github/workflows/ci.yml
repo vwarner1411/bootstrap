@@ -184,6 +184,23 @@ jobs:
               gpg --version
             '
 
+  ubuntu-sudors-e2e:
+    runs-on: ubuntu-latest
+    needs:
+      - ubuntu-smoke
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The Linux e2e jobs run as root and never enter arrange_become, and
+      # macos-e2e only covers original sudo. This is the sudo-rs path.
+      - name: Check escalation against sudo-rs as a non-root user
+        run: |
+          docker run --rm \
+            -v "$PWD":/workspace \
+            ubuntu:26.04 \
+            bash /workspace/tests/e2e-sudors.sh
+
   debian-e2e:
     runs-on: ubuntu-latest
     needs:

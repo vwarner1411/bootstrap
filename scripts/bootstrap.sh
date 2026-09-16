@@ -720,4 +720,9 @@ main() {
   log "Bootstrap completed successfully"
 }
 
-main "$@"
+# Tests source this file to exercise individual functions; a normal run, piped
+# or not, must still execute main. Do not swap this for a BASH_SOURCE guard:
+# under `bash -c "$(curl ...)"` BASH_SOURCE is unset and main would never run.
+if [ -z "${BOOTSTRAP_SOURCE_ONLY:-}" ]; then
+  main "$@"
+fi
