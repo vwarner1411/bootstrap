@@ -550,7 +550,10 @@ stage_server_prep_assets() {
 install_collections() {
   log "Installing Ansible collections"
   ensure_directory "$WORKDIR/collections"
-  ansible-galaxy collection install -r "$WORKDIR/requirements.yml" --force -p "$WORKDIR/collections"
+  # ansible-galaxy writes a placeholder cache entry before each API call, so a
+  # failed or interrupted run can leave one without results that breaks every
+  # retry for a day. Start each bootstrap with a fresh response cache.
+  ansible-galaxy collection install -r "$WORKDIR/requirements.yml" --force --clear-response-cache -p "$WORKDIR/collections"
 }
 
 bootstrap_sudoers_file() {
