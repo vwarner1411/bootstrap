@@ -113,6 +113,16 @@
   become: "{{ shell_extras_run_as_target }}"
   become_user: "{{ shell_extras_target_user }}"
 
+# Ubuntu's default umask of 002 leaves the clones group-writable, and
+# oh-my-zsh's compaudit then refuses to load completions from them.
+- name: Remove group and other write access from oh-my-zsh
+  ansible.builtin.file:
+    path: "{{ shell_extras_oh_my_zsh_dir }}"
+    mode: "g-w,o-w"
+    recurse: true
+  become: "{{ shell_extras_run_as_target }}"
+  become_user: "{{ shell_extras_target_user }}"
+
 - name: Ensure Zsh completions directory exists
   ansible.builtin.file:
     path: "{{ shell_extras_zshrc_dir }}"
